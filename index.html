@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gubby House — Full Game</title>
+  <!--
+  IMPORTANT: Firestore Security Rules (PUT THESE IN FIREBASE CONSOLE -> Firestore -> Rules)
+  ---------------------------------------------------------------------------
+  The following rules assume you have collections: "users", "rooms", "variants", and "shop".
+  - users documents: userId -> { displayName, email, privileges }
+  - rooms documents: roomCode -> { state, updatedAt }
+  - variants documents: auto-generated or ID -> { id, fileName, price, attributes, createdBy }
+
+  Replace <YOUR_PROJECT_ID> where appropriate if you use any explicit references.
+
+  RULES (example, copy-paste into Firestore rules editor):
+
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+
+      // Users: a user can read their own profile and write some fields on signup only.
+      match /users/{userId} {
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        // only admins can update privileges field
+        allow update: if request.auth != null && (
+          // user can update their own non-privileges fields
+          (request.auth.uid == userId && !("privileges" in request.resource.data))
+          ||
+          // admins can update anything
+          (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin')
+        );
+      }
+
+      // Variants: admins create/update/delete; everyone can read
+      match /variants/{variantId} {
+        allow read: if true;
+        allow create, update, delete: if request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin';
+      }
+
+      // Rooms (multiplayer state). Users in the room may update the room state but we keep it permissive
+      match /rooms/{roomId} {
+        allow read: if true; // allow read so friends can join
+        allow create: if request.auth != null;
+        allow update: if request.auth != null; // you can implement stricter checks if desired
+      }
+
+      // Shop: admins can add items, read allowed to all
+      match /shop/{shopId} {
+        allow read: if true;
+        allow create, update, delete: if request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin';
+      }
+
+      // Fallback deny
+      match /{document=**} { allow read, write: if false; }
+    }
+  }
+
+  NOTES:
+  - By default, new users should be written to /users/{uid} with privileges: 'normal'. You can edit privileges manually in the Firebase Console to 'admin'.
+  - The app attempts basic client-side checks for admin UI but relies on the Firestore rules above for true enforcement.
+  - Files referenced for sprites must be hosted in your GitHub repo under /sprites/variants/*.png and served by your web host.
+
+  -->
+  <style>
+    :root{--bg:#f3f7fb;--card:#fff;--accent:#6b8cff}
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
+    body{margin:0;min-height:100vh;background:linear-gradient(#e6f3ff,#f7fbff);display:flex;align-items:center;justify-content:center;padding:18px}
+    .app{width:100%;max-width:1200px;background:var(--card);border-radius:12px;box-shadow:0 14px 40px rgba(10,10,30,0.12);overflow:hidden}
+    header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #eef3ff}
+    header h1{margin:0;font-size:18px}
+    .main{display:grid;grid-template-columns:560px 1fr;gap:12px;padding:18px}
+    .left{background:#f8fbff;border-radius:10px;padding:12px}
+    .right{padding:12px}
+    .house{width:520px;height:420px;background-image:linear-gradient(#fff,#def);border-radius:8px;position:relative;overflow:hidden;border:2px solid #e6f2ff}
+    .gubby-sprite{position:absolute;transform:translate(-50%,-50%);width:96px;height:96px;transition:left .5s linear, top .5s linear, transform .2s}
+    .hud{display:flex;gap:8px;margin-top:8px}
+    .stat{background:white;padding:8px;border-radius:8px;border:1px solid #eef4ff;flex:1}
+    .stat strong{display:block}
+    .controls{display:flex;gap:8px;margin-top:8px}
+    button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer}
+    button.secondary{background:#eef3ff;color:#164ea6}
+    .panel{background:#fff;padding:10px;border-radius:8px;border:1px solid #eef4ff;margin-bottom:12px}
+    label{font-size:13px;color:#444}
+    input[type=text], input[type=password], input[type=number], select{width:100%;padding:8px;margin-top:6px;border-radius:8px;border:1px solid #e6eef9}
+    .small{font-size:12px;color:#667}
+    .variants-list{display:flex;gap:8px;flex-wrap:wrap}
+    .variant-pill{padding:6px 8px;border-radius:8px;border:1px solid #e6eef9;background:white}
+    .admin-panel{display:none;border-top:1px dashed #e6eef9;padding-top:8px;margin-top:8px}
+    .visible{display:block}
+    .muted{color:#667;font-size:13px}
+    .row{display:flex;gap:8px;align-items:center}
+    footer{padding:12px;border-top:1px solid #f0f6ff;text-align:center;font-size:12px;color:#666}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Gubby House</h1>
+      <div style="margin-left:auto" id="authArea" class="muted small">Not signed in</div>
+    </header>
+    <div class="main">
+      <div class="left">
+        <div class="house" id="house">
+          <!-- background house image could go here -->
+          <img id="gubbySprite" class="gubby-sprite" src="/sprites/variants/default.png" style="left:50%;top:60%" draggable="false" />
+        </div>
+
+        <div class="hud">
+          <div class="stat"><strong>Hunger <span id="hungerVal">0</span>%</strong><div class="small" id="hungerBar">—</div></div>
+          <div class="stat"><strong>Thirst <span id="thirstVal">0</span>%</strong><div class="small" id="thirstBar">—</div></div>
+          <div class="stat"><strong>Energy <span id="energyVal">0</span>%</strong><div class="small" id="energyBar">—</div></div>
+        </div>
+
+        <div class="controls">
+          <button id="feedBtn">Feed</button>
+          <button id="waterBtn" class="secondary">Give Water</button>
+          <button id="colaBtn">Give Bloxy Cola</button>
+          <button id="playBtn" class="secondary">Play (increase happiness)</button>
+        </div>
+
+      </div>
+
+      <div class="right">
+        <div class="panel">
+          <label>Account</label>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input type="text" id="email" placeholder="email" />
+            <input type="password" id="password" placeholder="password" />
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="signupBtn">Sign up</button>
+            <button id="signinBtn" class="secondary">Sign in</button>
+            <button id="signoutBtn" class="secondary" style="display:none">Sign out</button>
+          </div>
+          <div id="accountInfo" class="muted small" style="margin-top:8px">—</div>
+        </div>
+
+        <div class="panel">
+          <label>Shop & Upgrades</label>
+          <div id="shopList" style="margin-top:8px"></div>
+        </div>
+
+        <div class="panel">
+          <label>Variants</label>
+          <div class="variants-list" id="variantsList"></div>
+        </div>
+
+        <div class="panel admin-panel" id="adminPanel">
+          <label>Admin Panel — Create Variant / Shop Item</label>
+          <div style="margin-top:8px">
+            <label>Variant ID</label>
+            <input type="text" id="variantId" placeholder="e.g. LavaGubby" />
+            <label style="margin-top:6px">File name (inside /sprites/variants/)</label>
+            <input type="text" id="variantFile" placeholder="e.g. lava.png" />
+            <label style="margin-top:6px">Price (clicks)</label>
+            <input type="number" id="variantPrice" value="500" />
+            <label style="margin-top:6px">Attributes (json) — e.g. {"clickMultiplier":2,"energyBonus":10}</label>
+            <input type="text" id="variantAttrs" placeholder='{"clickMultiplier":2,"energyBonus":10}' />
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button id="createVariantBtn">Create Variant</button>
+              <button id="refreshVariants" class="secondary">Refresh</button>
+            </div>
+            <div class="muted small" style="margin-top:8px">Admin-only: creating a variant will add a shop upgrade. The client will use /sprites/variants/{fileName} for the image — make sure the file exists in your GitHub repo served at that path.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <footer>Tip: Host this repo on GitHub Pages (or similar) so /sprites/variants/* are served. Replace firebaseConfig in the script with your project's values.</footer>
+  </div>
+
+<script>
+// ================== CONFIG ==================
+// Paste your Firebase config here (replace empty object) to enable auth & Firestore.
+const firebaseConfig = {};
+// ==================================================
+
+// Quick helpers
+function el(id){return document.getElementById(id)}
+
+// Game state
+const defaultState = {
+  name: 'Gubby',
+  variant: 'default.png',
+  pos:{x:260,y:210},
+  hunger:80, thirst:80, energy:100, alive:true,
+  clicks:0, totalClicks:0,
+  upgrades:{clickPower:1, autoClicks:0, multipliers:[]}
+};
+let state = loadState();
+let user = null;
+let db = null;
+let auth = null;
+
+// UI refs
+const gubbySprite = el('gubbySprite');
+const hungerVal = el('hungerVal'), thirstVal = el('thirstVal'), energyVal = el('energyVal');
+const feedBtn = el('feedBtn'), waterBtn = el('waterBtn'), colaBtn = el('colaBtn'), playBtn = el('playBtn');
+const shopList = el('shopList'), variantsList = el('variantsList');
+const adminPanel = el('adminPanel');
+const authArea = el('authArea');
+const accountInfo = el('accountInfo');
+
+// Initialize
+applyStateToUI();
+renderShop();
+renderVariantsClientSide();
+
+// Movement: simple autonomous wandering inside house bounds
+const houseRect = {w:520,h:420};
+function wander(){ if(!state.alive) return; // pick a new random position
+  const margin = 48;
+  const x = Math.random()*(houseRect.w - margin*2) + margin;
+  const y = Math.random()*(houseRect.h - margin*2) + margin;
+  state.pos.x = x; state.pos.y = y;
+  gubbySprite.style.left = x + 'px'; gubbySprite.style.top = y + 'px';
+}
+setInterval(wander, 3000);
+
+// Clicking gubby
+gubbySprite.addEventListener('click', ()=>{
+  if(!state.alive) return; const power = state.upgrades.clickPower * (getMultiplier());
+  addClicks(power);
+  state.energy = Math.max(0, state.energy - 1);
+  state.hunger = Math.max(0, state.hunger - 0.5);
+  state.thirst = Math.max(0, state.thirst - 0.7);
+  applyStateToUI();
+  saveState();
+  if(db) syncRoom();
+});
+
+// Buttons
+feedBtn.addEventListener('click', ()=>{ if(!state.alive) return; state.hunger = Math.min(100, state.hunger + 25); applyStateToUI(); saveState(); if(db) syncRoom(); });
+waterBtn.addEventListener('click', ()=>{ if(!state.alive) return; state.thirst = Math.min(100, state.thirst + 25); applyStateToUI(); saveState(); if(db) syncRoom(); });
+colaBtn.addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100, state.energy + 50); applyStateToUI(); saveState(); if(db) syncRoom(); });
+playBtn.addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100, state.energy + 10); addClicks(5); applyStateToUI(); saveState(); if(db) syncRoom(); });
+
+// Decay loop
+setInterval(()=>{
+  if(!state.alive) return;
+  state.hunger = Math.max(0, state.hunger - 1);
+  state.thirst = Math.max(0, state.thirst - 1.2);
+  // energy decreases during day, regain when sleeping (simple day cycle)
+  const hour = (new Date()).getHours();
+  if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2);
+  else state.energy = Math.max(0, state.energy - 0.5);
+  if(state.hunger===0 || state.thirst===0) state.energy = Math.max(0, state.energy - 2);
+  if(state.energy===0){ state.alive=false; gubbySprite.src='/sprites/variants/dead.png'; }
+  applyStateToUI(); saveState(); if(db) syncRoom();
+}, 10000);
+
+// Auto clickers
+setInterval(()=>{ if(state.upgrades.autoClicks>0 && state.alive){ addClicks(state.upgrades.autoClicks); saveState(); if(db) syncRoom(); } }, 2000);
+
+function addClicks(n){ state.clicks += n; state.totalClicks += n; }
+function getMultiplier(){ let m=1; if(state.upgrades.multipliers){ state.upgrades.multipliers.forEach(v=>m*=v); } return m; }
+
+function applyStateToUI(){ hungerVal.textContent = Math.round(state.hunger); thirstVal.textContent = Math.round(state.thirst); energyVal.textContent = Math.round(state.energy);
+  gubbySprite.src = `/sprites/variants/${state.variant}`;
+}
+
+function saveState(){ localStorage.setItem('gubby_full_v1', JSON.stringify(state)); }
+function loadState(){ try{ const raw = localStorage.getItem('gubby_full_v1'); if(raw) return JSON.parse(raw); }catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
+
+// ---------------- Firebase: Auth + Firestore integration ----------------
+async function enableFirebase(){ if(Object.keys(firebaseConfig).length===0) return;
+  // load compat SDKs for quick integration
+  await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+  await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js');
+  await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
+  // initialize
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+
+  // Auth state
+  auth.onAuthStateChanged(async u=>{
+    if(u){ user = u; authArea.textContent = `Signed in: ${u.email}`; el('signinBtn').style.display='none'; el('signupBtn').style.display='none'; el('signoutBtn').style.display='inline-block';
+      // ensure user doc exists with privileges: 'normal'
+      const userRef = db.collection('users').doc(u.uid);
+      const doc = await userRef.get();
+      if(!doc.exists){ await userRef.set({displayName:u.email.split('@')[0], email:u.email, privileges:'normal'}); }
+      const profile = (await userRef.get()).data();
+      accountInfo.textContent = `Privileges: ${profile.privileges}`;
+      // if admin show admin panel
+      if(profile.privileges === 'admin'){ adminPanel.classList.add('visible'); }
+      else adminPanel.classList.remove('visible');
+      // sync user-specific gubby state (optional)
+      const myDoc = db.collection('rooms').doc('user_'+u.uid);
+      // attempt to load remote state
+      const r = await myDoc.get(); if(r.exists){ const remote = r.data().state; if(remote) { state = Object.assign(state, remote); applyStateToUI(); saveState(); } }
+
+    } else { user=null; authArea.textContent = 'Not signed in'; el('signinBtn').style.display='inline-block'; el('signupBtn').style.display='inline-block'; el('signoutBtn').style.display='none'; adminPanel.classList.remove('visible'); accountInfo.textContent='—'; }
+  });
+
+  // realtime: listen to variants and shop collections
+  db.collection('variants').onSnapshot(snap=>{ renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))); });
+  db.collection('shop').onSnapshot(snap=>{ renderShopFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))); });
+}
+
+// Auth buttons
+el('signupBtn').addEventListener('click', async ()=>{
+  if(Object.keys(firebaseConfig).length===0){ alert('Paste firebaseConfig in the file to enable auth'); return; }
+  const email = el('email').value, pwd = el('password').value; if(!email || !pwd) return alert('enter credentials');
+  try{ await auth.createUserWithEmailAndPassword(email,pwd); alert('Signup successful'); }catch(e){ alert(e.message); }
+});
+
+el('signinBtn').addEventListener('click', async ()=>{
+  if(Object.keys(firebaseConfig).length===0){ alert('Paste firebaseConfig in the file to enable auth'); return; }
+  const email = el('email').value, pwd = el('password').value; if(!email || !pwd) return alert('enter credentials');
+  try{ await auth.signInWithEmailAndPassword(email,pwd); }catch(e){ alert(e.message); }
+});
+
+el('signoutBtn').addEventListener('click', async ()=>{ await auth.signOut(); alert('Signed out'); });
+
+// Admin create variant
+el('createVariantBtn').addEventListener('click', async ()=>{
+  if(!db) return alert('Enable Firebase config first');
+  const id = el('variantId').value.trim(); const file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0; let attrs = {};
+  try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON for attributes'); }
+  if(!id||!file) return alert('Provide id and file name');
+  // Validate by checking if file exists on server
+  try{
+    const res = await fetch('/sprites/variants/'+file, {method:'HEAD'});
+    if(!res.ok){ if(!confirm('Variant image not found at /sprites/variants/'+file+". Create anyway?")) return; }
+  }catch(e){ if(!confirm('Could not check file existence. Create anyway?')) return; }
+  // Create variant doc and shop item
+  const variantDoc = {
+    id, fileName:file, price, attributes:attrs, createdBy: user? user.uid : 'local', createdAt: Date.now()
+  };
+  try{
+    await db.collection('variants').add(variantDoc);
+    // also add to shop as purchasable upgrade
+    await db.collection('shop').add({type:'variant', variantFile:file, variantId:id, price:price, attributes:attrs});
+    alert('Variant + shop item created');
+  }catch(e){ alert('Firestore error: '+e.message); }
+});
+
+// Render helpers for shop & variants
+function renderShop(){ // client-side fallback shop (if firestore not configured)
+  const local = [
+    {title:'Upgrade Click Power', price:100, onbuy:()=>{ state.upgrades.clickPower +=1; state.totalClicks = Math.max(0,state.totalClicks - 100); saveState(); applyStateToUI(); }},
+    {title:'Auto Clicker', price:500, onbuy:()=>{ state.upgrades.autoClicks+=1; state.totalClicks = Math.max(0,state.totalClicks - 500); saveState(); applyStateToUI(); }},
+    {title:'Multiplier +50%', price:1500, onbuy:()=>{ state.upgrades.multipliers.push(1.5); state.totalClicks = Math.max(0,state.totalClicks - 1500); saveState(); applyStateToUI(); }}
+  ];
+  shopList.innerHTML=''; local.forEach(it=>{
+    const d = document.createElement('div'); d.className='row'; d.style.justifyContent='space-between'; d.innerHTML = `<div><strong>${it.title}</strong><div class="small">Price: ${it.price} clicks</div></div><div><button>Buy</button></div>`;
+    shopList.appendChild(d); d.querySelector('button').addEventListener('click', ()=>{ if(state.totalClicks < it.price) return alert('Not enough clicks'); it.onbuy(); });
+  });
+}
+
+function renderShopFromFirestore(items){ shopList.innerHTML=''; items.forEach(doc=>{
+  const d = document.createElement('div'); d.className='row'; d.style.justifyContent='space-between'; d.innerHTML = `<div><strong>${doc.type||doc.title||'Shop Item'}</strong><div class="small">Price: ${doc.price || doc.price}</div></div><div><button>Buy</button></div>`;
+  shopList.appendChild(d); d.querySelector('button').addEventListener('click', async ()=>{
+    // purchase handling: for demo we deduct from totalClicks and apply attributes
+    if(state.totalClicks < (doc.price||0)) return alert('Not enough clicks');
+    state.totalClicks = Math.max(0, state.totalClicks - (doc.price||0));
+    // if variant type, equip variant or add to upgrades
+    if(doc.type==='variant'){ state.variant = doc.variantFile; }
+    if(doc.attributes){ // apply basic attributes
+      if(doc.attributes.clickMultiplier) state.upgrades.multipliers.push(doc.attributes.clickMultiplier);
+      if(doc.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + doc.attributes.autoClicks;
+      if(doc.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + doc.attributes.clickPower;
+    }
+    saveState(); applyStateToUI(); if(db) syncRoom(); alert('Purchased');
+  });
+}); }
+
+function renderVariantsClientSide(){ // show files inside sprites/variants by scanning known filenames in repo? fallback to common list
+  const known = ['default.png','water.png','lava.png','grass.png']; variantsList.innerHTML=''; known.forEach(fn=>{ const pill = document.createElement('div'); pill.className='variant-pill'; pill.textContent = fn; pill.addEventListener('click', ()=>{ state.variant = fn; applyStateToUI(); saveState(); if(db) syncRoom(); }); variantsList.appendChild(pill); }); }
+
+function renderVariantsFromFirestore(items){ variantsList.innerHTML=''; items.forEach(v=>{ const pill = document.createElement('div'); pill.className='variant-pill'; pill.textContent = v.fileName + (v.price? ' — ' + v.price : ''); pill.addEventListener('click', ()=>{ state.variant = v.fileName; applyStateToUI(); saveState(); if(db) syncRoom(); }); variantsList.appendChild(pill); }); }
+
+// Sync room state (simple design): store per-user room under rooms/{roomCode}
+async function syncRoom(){ if(!db || !user) return; try{ const roomDoc = db.collection('rooms').doc('user_'+user.uid); await roomDoc.set({state, updatedAt: Date.now(), owner:user.uid}); }catch(e){ console.error(e); } }
+
+// Utility: dynamic script loader
+function loadScript(src){ return new Promise((resolve,reject)=>{ const s=document.createElement('script'); s.src=src; s.onload=resolve; s.onerror=reject; document.head.appendChild(s); }); }
+
+// Auto-enable firebase if config provided
+if(Object.keys(firebaseConfig).length>0){ enableFirebase(); }
+
+// expose to window for debugging
+window.gubbyGame = { state, saveState, loadState, enableFirebase };
+
+</script>
+</body>
+</html>
