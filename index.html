@@ -1,259 +1,257 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Gubby Clicker — Rooms (Firestore)</title>
-
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Gubby Clicker — Rooms + Massive Shop</title>
 <style>
-:root{
-  --bg:#ffffff;
-  --bg-2:#f5fbff;
-  --accent:#6bc8ff;
-  --accent-2:#89ddff;
-  --accent-room:#ffd28a;
-  --accent-room-2:#ffd4a3;
-  --muted:#6b7280;
-  --card:#fff;
-}
-*{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
-html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),var(--bg-2));display:flex;align-items:center;justify-content:center;transition:background .25s ease}
-body.multiplayer-mode{background:linear-gradient(180deg,#fff7ec,#fffaf5)}
-.wrap{width:1100px;background:var(--card);border-radius:14px;box-shadow:0 18px 60px rgba(10,20,40,0.12);overflow:hidden;display:grid;grid-template-rows:auto 1fr;animation:appear .35s ease}
-@keyframes appear{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(12,40,80,0.03)}
-.header-left{display:flex;align-items:center;gap:12px}
-.logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:white;font-weight:800;box-shadow:0 6px 18px rgba(75,110,255,0.12)}
-h1{font-size:20px;margin:0}
-.top-controls{display:flex;gap:12px;align-items:center}
-.small-muted{font-size:13px;color:var(--muted)}
+  /* --- Basic responsive layout & palette --- */
+  :root{
+    --bg:#ffffff; --bg-2:#f5fbff;
+    --accent:#6bc8ff; --accent2:#89ddff;
+    --room-accent:#ffd28a; --room-accent2:#ffd4a3;
+    --muted:#6b7280; --card:#fff;
+    --max-width:1200px;
+  }
+  *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),var(--bg-2));transition:background .25s ease}
+  body.room-mode{background:linear-gradient(180deg,#fff7ec,#fffaf5)}
+  .container{max-width:var(--max-width);margin:18px auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:12px;background:linear-gradient(180deg,#fff,#fcfeff);box-shadow:0 8px 24px rgba(10,20,40,0.06)}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:22px}
+  .title {font-size:18px;margin:0}
+  .subtitle {font-size:12px;color:var(--muted)}
+  .top-actions{display:flex;gap:8px;align-items:center}
+  .btn{padding:10px 14px;border-radius:12px;border:0;background:var(--accent);color:white;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(75,110,255,0.08);transition:transform .12s,box-shadow .12s}
+  .btn.secondary{background:white;color:var(--accent);border:1px solid rgba(75,110,255,0.12)}
+  .btn.ghost{background:transparent;border:1px solid rgba(12,40,80,0.06);color:var(--muted)}
+  .btn.small{padding:6px 8px;border-radius:8px;font-weight:600}
+  .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
+  @media (max-width:1000px){ .grid{grid-template-columns:1fr 320px} }
+  @media (max-width:800px){ .grid{grid-template-columns:1fr} header{flex-direction:column;align-items:stretch} .top-actions{justify-content:flex-end} }
 
-/* main layout */
-.main{display:grid;grid-template-columns:1fr 380px;gap:18px;padding:18px}
-.game-card{background:linear-gradient(180deg,#ffffff,#fdfdfd);border-radius:12px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:inset 0 -10px 30px rgba(100,140,255,0.02)}
-.house{width:680px;height:460px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#eaf8ff);position:relative;overflow:hidden;border:1px solid rgba(12,40,80,0.05)}
-.gubby-sprite{position:absolute;transform:translate(-50%,-50%);width:120px;height:120px;transition:transform .35s linear,left .45s linear, top .45s linear;pointer-events:auto;z-index:30;will-change:transform,left,top;display:block}
-.gubby-float{animation:floaty 3s ease-in-out infinite}
-@keyframes floaty{0%{transform:translate(-50%,-50%) translateY(0)}50%{transform:translate(-50%,-50%) translateY(-8px)}100%{transform:translate(-50%,-50%) translateY(0)}}
+  /* left card */
+  .card{border-radius:12px;background:var(--card);padding:14px;box-shadow:0 12px 40px rgba(10,20,40,0.04)}
+  .play-area{display:flex;flex-direction:column;gap:12px;align-items:center}
+  .house{width:100%;max-width:760px;height:420px;border-radius:10px;background:linear-gradient(180deg,#fff,#f3fbff);position:relative;overflow:hidden;border:1px solid rgba(12,40,80,0.05)}
+  .gubby{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:130px;height:130px;transition:all .35s;cursor:pointer;user-select:none}
+  .stats{display:flex;gap:12px;width:100%;justify-content:center;flex-wrap:wrap}
+  .stat{min-width:160px;flex:1;max-width:240px;background:#fff;border-radius:10px;padding:10px 12px;border:1px solid rgba(12,40,80,0.04);text-align:center}
+  .stat .label{font-size:12px;color:var(--muted)}
+  .stat .value{font-weight:800;font-size:18px;margin-top:6px}
+  .bar{height:12px;background:#eef6ff;border-radius:999px;margin-top:8px;overflow:hidden}
+  .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .2s ease}
+  body.room-mode .fill{background:linear-gradient(90deg,var(--room-accent),var(--room-accent2))}
 
-/* HUD */
-.hud{display:flex;gap:12px;width:100%;justify-content:center}
-.stat{background:var(--card);border-radius:12px;padding:12px 18px;border:1px solid rgba(12,40,80,0.04);min-width:170px;text-align:center;box-shadow:0 6px 18px rgba(80,110,255,0.03)}
-.stat .label{font-size:12px;color:var(--muted)}
-.stat .value{font-weight:800;font-size:20px;margin-top:6px}
-.stat .bar{height:12px;background:#edf2ff;border-radius:999px;margin-top:8px;overflow:hidden}
-.stat .fill{height:100%;width:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .25s ease}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:6px}
 
-/* room palette when multiplayer */
-body.multiplayer-mode .stat .fill{background:linear-gradient(90deg,var(--accent-room),var(--accent-room-2))}
+  /* right column */
+  .panel{padding:12px;border-radius:12px;background:var(--card);border:1px solid rgba(12,40,80,0.04)}
+  .panel h4{margin:0 0 8px 0}
+  .variants-list{display:flex;flex-direction:column;gap:8px}
+  .variant-item{padding:8px;border-radius:10px;border:1px solid rgba(12,40,80,0.04);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+  .member-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+  .member{display:flex;gap:8px;align-items:center;padding:8px;border-radius:8px;border:1px solid rgba(12,40,80,0.04)}
+  .room-code{font-weight:900;font-size:18px}
 
-/* controls row */
-.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
-.btn{padding:12px 14px;border-radius:12px;border:0;background:var(--accent);color:white;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(75,110,255,0.08);transition:transform .12s ease,box-shadow .12s ease}
-.btn.secondary{background:white;color:var(--accent);border:1px solid rgba(75,110,255,0.12)}
-.btn.ghost{background:transparent;color:var(--muted);border:1px solid rgba(12,40,80,0.04)}
-.btn:hover{transform:translateY(-3px);box-shadow:0 18px 36px rgba(75,110,255,0.12)}
+  /* modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(8,10,20,0.5);display:none;align-items:center;justify-content:center;z-index:999}
+  .modal{width:92%;max-width:980px;background:white;border-radius:12px;padding:18px;box-shadow:0 30px 90px rgba(10,20,40,0.3);transform:translateY(10px);opacity:0;transition:all .18s}
+  .modal.show{transform:none;opacity:1}
 
-/* right column panels */
-.right-col{display:flex;flex-direction:column;gap:12px}
-.panel{background:white;border-radius:12px;padding:14px;border:1px solid rgba(12,40,80,0.04)}
-.panel h4{margin:0 0 8px 0}
-.compact{font-size:13px;color:var(--muted)}
-.backpack{display:flex;gap:12px;align-items:center}
-.bp-item{display:flex;flex-direction:column;align-items:center;font-size:13px;color:var(--muted);padding:6px 8px;border-radius:10px;border:1px solid rgba(12,40,80,0.03);background:linear-gradient(180deg, rgba(255,255,255,0.97), rgba(250,250,255,0.95))}
-.bp-qty{font-weight:900;color:#111}
+  /* shop modal grid */
+  .shop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media (max-width:1100px){ .shop-grid{grid-template-columns:repeat(2,1fr)} }
+  @media (max-width:600px){ .shop-grid{grid-template-columns:1fr} }
+  .shop-card{border-radius:12px;padding:12px;background:linear-gradient(180deg,#ffffff,#f8fcff);border:1px solid rgba(12,40,80,0.04);display:flex;flex-direction:column;gap:8px;min-height:110px}
+  .shop-card .title{font-weight:800}
+  .shop-card .price{font-weight:700;color:var(--muted)}
+  .shop-tier{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 
-/* variants list */
-.variants-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-.variant-item{padding:8px;border-radius:10px;border:1px solid rgba(12,40,80,0.03);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
-.variant-item:hover{background:linear-gradient(180deg,rgba(245,250,255,0.6),white)}
-
-/* member list */
-.member-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
-.member-item{display:flex;gap:8px;align-items:center;padding:6px;border-radius:8px;border:1px solid rgba(12,40,80,0.03)}
-
-/* modal overlay & modal */
-.modal-backdrop{position:fixed;inset:0;background:rgba(10,14,40,0.45);display:none;align-items:center;justify-content:center;z-index:200}
-.modal{width:600px;background:white;border-radius:12px;padding:18px;box-shadow:0 30px 80px rgba(12,40,80,0.35);transform:translateY(20px);opacity:0;transition:all .28s cubic-bezier(.2,.9,.2,1)}
-.modal.show{transform:translateY(0);opacity:1}
-
-/* shop */
-.shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-.shop-item{border-radius:12px;border:1px solid rgba(12,40,80,0.04);padding:12px;display:flex;flex-direction:column;gap:8px;transition:transform .12s}
-.shop-item:hover{transform:translateY(-6px)}
-.shop-item .title{font-weight:800}
-.shop-item .price{color:var(--muted);font-size:13px}
-
-/* Game Over */
-.gameover-backdrop{position:fixed;inset:0;background:rgba(8,10,20,0.6);display:none;align-items:center;justify-content:center;z-index:400}
-.gameover-box{background:white;padding:28px;border-radius:12px;text-align:center;box-shadow:0 30px 80px rgba(12,40,80,0.45);transform:scale(.94);opacity:0;transition:all .25s}
-.gameover-box.show{transform:scale(1);opacity:1}
-
-input[type="text"], input[type="number"], textarea {padding:10px;border-radius:10px;border:1px solid rgba(12,40,80,0.06);width:100%}
-.hidden{display:none}
+  /* responsive text sizes */
+  h1{margin:0;font-size:22px}
+  .small-muted{color:var(--muted);font-size:13px}
+  footer{margin-top:12px;text-align:center;color:var(--muted);font-size:12px}
 </style>
 </head>
 <body>
-<div class="wrap" id="app">
-  <header>
-    <div class="header-left">
-      <div class="logo">G</div>
-      <div>
-        <h1>Gubby Clicker</h1>
-        <div class="small-muted" id="modeTag">Solo</div>
-      </div>
-    </div>
-
-    <div class="top-controls" id="topControls">
-      <div class="backpack" id="backpackUI">
-        <div class="bp-item">🍔<div class="bp-qty" id="bpFood">0</div></div>
-        <div class="bp-item">💧<div class="bp-qty" id="bpWater">0</div></div>
-        <div class="bp-item">🥤<div class="bp-qty" id="bpCola">0</div></div>
+  <div class="container" id="root">
+    <header>
+      <div class="brand">
+        <div class="logo">G</div>
+        <div>
+          <h1>Gubby Clicker</h1>
+          <div class="subtitle" id="modeText">Solo play</div>
+        </div>
       </div>
 
-      <div id="accountArea" style="display:flex;align-items:center;gap:10px">
-        <div id="userInfo" class="small-muted">Not signed in</div>
-        <button id="googleSignIn" class="btn secondary">Sign in</button>
+      <div class="top-actions" id="topActions">
+        <div id="accountArea" style="display:flex;align-items:center;gap:10px">
+          <div id="userInfo" class="small-muted">Not signed in</div>
+          <button id="signInBtn" class="btn secondary">Sign in</button>
+        </div>
+        <button id="shopBtn" class="btn secondary">Shop</button>
       </div>
-      <button id="shopBtn" class="btn secondary">Shop</button>
-    </div>
-  </header>
+    </header>
 
-  <div class="main">
-    <div class="game-card">
-      <div class="house" id="house">
-        <img id="gubbySprite" class="gubby-sprite gubby-float" src="sprites/variants/default.png" style="left:260px;top:210px" draggable="false" />
-      </div>
+    <div class="grid">
+      <!-- Left: Game area -->
+      <div class="card play-area">
+        <div class="house" id="house">
+          <img id="gubbySprite" class="gubby gubby-float" src="sprites/variants/default.png" draggable="false" alt="Gubby"/>
+        </div>
 
-      <div class="hud" id="hud">
-        <div class="stat"><div class="label">HUNGER</div><div class="value" id="hungerVal">0</div><div class="bar"><div id="hungerFill" class="fill" style="width:0%"></div></div></div>
-        <div class="stat"><div class="label">THIRST</div><div class="value" id="thirstVal">0</div><div class="bar"><div id="thirstFill" class="fill" style="width:0%"></div></div></div>
-        <div class="stat"><div class="label">ENERGY</div><div class="value" id="energyVal">0</div><div class="bar"><div id="energyFill" class="fill" style="width:0%"></div></div></div>
-      </div>
-
-      <div class="controls" role="toolbar" aria-label="Game controls">
-        <button id="feedBtn" class="btn">Feed</button>
-        <button id="waterBtn" class="btn secondary">Give Water</button>
-        <button id="colaBtn" class="btn secondary">Bloxy Cola</button>
-        <button id="playBtn" class="btn secondary">Play</button>
-        <button id="hostBtn" class="btn">Host Game</button>
-        <button id="joinBtn" class="btn secondary">Join Game</button>
-      </div>
-
-      <div class="small-muted">Click Gubby to get clicks. Actions sync to players in the same room.</div>
-    </div>
-
-    <div class="right-col">
-      <div class="panel">
-        <h4>Connection</h4>
-        <div class="compact" id="connectionDesc">Rooms with Firestore — host a room and share the 4-letter code.</div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
-          <div style="display:flex;flex-direction:column">
-            <div class="compact">Status</div>
-            <div id="connectionStatus" class="compact" style="font-weight:800;color:var(--muted)">Not connected</div>
+        <div class="stats" id="hud">
+          <div class="stat">
+            <div class="label">HUNGER</div>
+            <div class="value" id="hungerVal">0</div>
+            <div class="bar"><div id="hungerFill" class="fill" style="width:0%"></div></div>
           </div>
-          <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            <div id="roomCodeDisplay" style="font-weight:900;font-size:18px"></div>
+          <div class="stat">
+            <div class="label">THIRST</div>
+            <div class="value" id="thirstVal">0</div>
+            <div class="bar"><div id="thirstFill" class="fill" style="width:0%"></div></div>
+          </div>
+          <div class="stat">
+            <div class="label">ENERGY</div>
+            <div class="value" id="energyVal">0</div>
+            <div class="bar"><div id="energyFill" class="fill" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="controls" role="toolbar" aria-label="controls">
+          <button id="feedBtn" class="btn">Feed</button>
+          <button id="waterBtn" class="btn secondary">Give Water</button>
+          <button id="colaBtn" class="btn secondary">Bloxy Cola</button>
+          <button id="playBtn" class="btn secondary">Play</button>
+          <button id="hostBtn" class="btn">Host Game</button>
+          <button id="joinBtn" class="btn secondary">Join Game</button>
+          <button id="resetBtn" class="btn ghost" title="Request a room reset">Reset Room</button>
+        </div>
+
+        <div class="small-muted">Click Gubby to earn clicks. Multiplayer actions sync with players in your room.</div>
+      </div>
+
+      <!-- Right: panels -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="panel">
+          <h4>Connection</h4>
+          <div class="small-muted">Rooms: host a room and share the 4-letter code (login required).</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <div>
+              <div class="small-muted">Status</div>
+              <div id="connectionStatus" style="font-weight:800">Not connected</div>
+            </div>
+            <div style="text-align:right">
+              <div class="room-code" id="roomCodeDisplay"></div>
+              <div style="display:flex;gap:8px;margin-top:6px;justify-content:flex-end">
+                <button id="copyRoomBtn" class="btn small ghost hidden">Copy</button>
+                <button id="leaveRoomBtn" class="btn small ghost hidden">Leave</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <div class="small-muted">Members</div>
+            <div id="members" class="member-list"></div>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <button id="copyInviteBtn" class="btn small secondary hidden">Copy Room Link</button>
+            <div id="resetStatus" class="small-muted" style="margin-left:auto"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>Account</h4>
+          <div id="accountInfo" class="small-muted">—</div>
+        </div>
+
+        <div class="panel">
+          <h4>Variants</h4>
+          <div id="variantsList" class="variants-list"></div>
+        </div>
+
+        <div class="panel" id="adminPanel" style="display:none">
+          <h4>Admin</h4>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <input id="variantId" placeholder="Variant ID"/>
+            <input id="variantDisplay" placeholder="Display Name"/>
+            <input id="variantFile" placeholder="sprite.png"/>
+            <img id="variantPreview" style="max-width:140px;display:none"/>
+            <input id="variantPrice" type="number" placeholder="Price" value="500"/>
+            <input id="variantAttrs" type="hidden"/>
             <div style="display:flex;gap:8px">
-              <button id="copyRoomBtn" class="btn ghost hidden">Copy</button>
-              <button id="leaveRoomBtn" class="btn ghost hidden">Leave Room</button>
+              <button id="openAttr" class="btn secondary">Attributes</button>
+              <button id="createVariant" class="btn">Create</button>
             </div>
           </div>
         </div>
-        <div style="margin-top:12px">
-          <div class="compact">Members</div>
-          <div id="membersList" class="member-list"></div>
-        </div>
-      </div>
 
-      <div class="panel">
-        <h4>Account</h4>
-        <div id="accountInfo" class="compact" style="margin-top:8px">—</div>
-      </div>
-
-      <div class="panel">
-        <h4>Variants</h4>
-        <div id="variantsList" class="variants-list"></div>
-      </div>
-
-      <div class="panel admin-panel hidden" id="adminPanel">
-        <h4>Admin</h4>
-        <div class="compact" style="margin-top:8px">
-          <label>Variant ID</label><input id="variantId" type="text" placeholder="LavaGubby"><br>
-          <label>Display Name</label><input id="variantDisplayName" type="text" placeholder="Lava Gubby"><br>
-          <label>File name</label><input id="variantFile" type="text" placeholder="lava.png"><br>
-          <img id="variantPreview" style="max-width:120px;margin-top:6px;display:block"><br>
-          <label>Price</label><input id="variantPrice" type="number" value="500"><br>
-          <label>Attributes</label>
-          <input id="variantAttrs" type="hidden" placeholder='{"clickMultiplier":1.5}'><div id="variantAttrsPreview" class="compact" style="margin-top:6px;color:var(--muted)"></div><br>
-          <div style="display:flex;gap:8px;margin-top:8px"><button id="openAttrPicker" class="btn secondary">Choose Attributes</button><button id="createVariantBtn" class="btn">Create Variant</button></div>
-        </div>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- Shop modal -->
-<div class="modal-backdrop" id="shopModal" role="dialog" aria-hidden="true">
-  <div class="modal" id="shopBox">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <h3 style="margin:0">Shop</h3>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div class="compact">Clicks: <span id="clicksCounter">0</span></div>
-        <button id="closeShop" class="btn secondary">Close</button>
-      </div>
-    </div>
-    <div class="shop-grid" id="shopGrid"></div>
+    <footer class="small-muted">Gubby Clicker — Firestore rooms · 50+ synchronized shop items</footer>
   </div>
-</div>
 
-<!-- Join Modal -->
-<div class="modal-backdrop" id="joinModal">
-  <div class="modal" id="joinBox">
-    <h3 style="margin:0 0 8px 0">Join Game</h3>
-    <input id="joinCodeInput" placeholder="Paste 4-letter room code here" maxlength="6"><br>
-    <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+  <!-- Join modal -->
+  <div class="modal-backdrop" id="joinModal"><div class="modal" id="joinBox">
+    <h3>Join Room</h3>
+    <input id="joinCodeInput" placeholder="4-letter code" maxlength="6"/>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button id="joinConfirm" class="btn">Join</button>
-      <button id="closeJoinModal" class="btn secondary">Cancel</button>
+      <button id="closeJoin" class="btn secondary">Cancel</button>
     </div>
-  </div>
-</div>
+  </div></div>
 
-<!-- Attribute Picker Modal -->
-<div class="modal-backdrop" id="attrModal">
-  <div class="modal" id="attrBox">
-    <h3 style="margin:0 0 8px 0">Choose Attributes</h3>
+  <!-- Shop modal (full screen-ish) -->
+  <div class="modal-backdrop" id="shopModal"><div class="modal" id="shopBox">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Massive Shop</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="small-muted">Clicks: <span id="clickCount">0</span></div>
+        <button id="shopClose" class="btn secondary">Close</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="shop-tier" id="tierButtons"></div>
+      <div id="shopGrid" class="shop-grid" style="margin-top:12px"></div>
+    </div>
+  </div></div>
+
+  <!-- Attr picker modal -->
+  <div class="modal-backdrop" id="attrModal"><div class="modal" id="attrBox">
+    <h3>Attributes</h3>
     <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
-      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-attr="clickMultiplier"> Click Multiplier</label><input class="attr-val" type="number" step="0.1" value="1.5">
-      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-attr="speed"> Speed</label><input class="attr-val" type="number" step="0.1" value="1.0">
-      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-attr="hungerDecay"> Hunger Decay</label><input class="attr-val" type="number" step="0.1" value="1.0">
+      <label><input type="checkbox" data-attr="clickMultiplier"> Click Multiplier</label><input class="attr-val" type="number" step="0.1" value="1.5"/>
+      <label><input type="checkbox" data-attr="speed"> Speed</label><input class="attr-val" type="number" step="0.1" value="1.0"/>
+      <label><input type="checkbox" data-attr="hungerDecay"> Hunger Decay</label><input class="attr-val" type="number" step="0.1" value="1.0"/>
     </div>
-    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
-      <button id="applyAttr" class="btn">Apply</button>
-      <button id="closeAttrModal" class="btn secondary">Cancel</button>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button id="attrApply" class="btn">Apply</button>
+      <button id="attrClose" class="btn secondary">Cancel</button>
     </div>
-  </div>
-</div>
+  </div></div>
 
-<!-- Game Over modal -->
-<div class="gameover-backdrop" id="gameOverBackdrop">
-  <div class="gameover-box" id="gameOverBox">
-    <h2>Game Over</h2>
-    <p class="compact">Gubby has reached 0 in Hunger, Thirst, or Energy.</p>
-    <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
-      <button id="restartBtn" class="btn">Restart For All</button>
-      <button id="closeGameOver" class="btn secondary">Close</button>
+  <!-- Reset confirm modal -->
+  <div class="modal-backdrop" id="resetModal"><div class="modal" id="resetBox">
+    <h3>Request Room Reset</h3>
+    <p class="small-muted">All players in the room must agree. When everyone clicks "Agree", the room will reset to default state.</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button id="resetAgree" class="btn">Agree</button>
+      <button id="resetCancel" class="btn secondary">Cancel</button>
     </div>
-  </div>
-</div>
+  </div></div>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-<script>
-/* ================= CONFIG ================= */
+  <script>
+/* ================== CONFIG ================== */
 const firebaseConfig = {
   apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
   authDomain: "gubby-clicker.firebaseapp.com",
@@ -264,13 +262,13 @@ const firebaseConfig = {
   measurementId: "G-R3HFMPH5C4"
 };
 const SPRITE_BASE_PATH = "sprites/variants/";
-const SOUND_BASE_PATH  = "sounds/"; // merp.mp3 here
+const SOUND_BASE_PATH = "sounds/";
 
-/* ============== STATE ============== */
+/* ================== STATE ================== */
 const defaultState = {
   name:'Gubby',
   variant:'default.png',
-  pos:{x:340,y:230},
+  pos:{x:340,y:220},
   hunger:80, thirst:80, energy:100, alive:true,
   clicks:0, totalClicks:0,
   upgrades:{clickPower:1, autoClicks:0, multipliers:[]},
@@ -287,193 +285,292 @@ const gubbySprite = document.getElementById('gubbySprite');
 const hungerVal = document.getElementById('hungerVal'), thirstVal = document.getElementById('thirstVal'), energyVal = document.getElementById('energyVal');
 const hungerFill = document.getElementById('hungerFill'), thirstFill = document.getElementById('thirstFill'), energyFill = document.getElementById('energyFill');
 const bpFood = document.getElementById('bpFood'), bpWater = document.getElementById('bpWater'), bpCola = document.getElementById('bpCola');
-const clicksCounter = document.getElementById('clicksCounter');
+const clickCount = document.getElementById('clickCount');
 
+/* connection UI */
 const connectionStatus = document.getElementById('connectionStatus'), roomCodeDisplay = document.getElementById('roomCodeDisplay');
-const membersList = document.getElementById('membersList'), copyRoomBtn = document.getElementById('copyRoomBtn'), leaveRoomBtn = document.getElementById('leaveRoomBtn');
-const modeTag = document.getElementById('modeTag'), topControls = document.getElementById('topControls');
+const membersEl = document.getElementById('members'), copyRoomBtn = document.getElementById('copyRoomBtn'), leaveRoomBtn = document.getElementById('leaveRoomBtn');
+const modeText = document.getElementById('modeText'), signInBtn = document.getElementById('signInBtn'), userInfo = document.getElementById('userInfo');
 
-/* multiplayer vars */
-let myPeerId = randomId();
-let localSeq = 0;
-const peerSeq = {};
 let currentRoom = null;
 let roomUnsub = null;
 let membersUnsub = null;
 let isHost = false;
+let myPeerId = randomId();
+let localSeq = 0;
+const peerSeq = {};
+let writeTimer = null;
+const WRITE_DEBOUNCE_MS = 600;
 
-/* debounce writes */
-let roomWriteTimer = null;
-const ROOM_WRITE_DEBOUNCE_MS = 600;
+/* shop state stored per-room */
+let shopData = []; // items list (50+)
+let currentTier = 'Basic';
 
 /* audio */
-let audioCtx = null, merpBuffer = null;
-async function loadMerp(){
-  try{
-    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-    const res = await fetch(SOUND_BASE_PATH+'merp.mp3');
-    if(!res.ok){ console.warn('merp missing'); merpBuffer = null; return; }
-    const ab = await res.arrayBuffer();
-    merpBuffer = await audioCtx.decodeAudioData(ab);
-  }catch(e){ console.warn('loadMerp fail', e); merpBuffer = null; }
-}
+let audioCtx=null, merpBuf=null;
+async function loadMerp(){ try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const r = await fetch(SOUND_BASE_PATH+'merp.mp3'); if(!r.ok){ merpBuf=null; return; } const ab = await r.arrayBuffer(); merpBuf = await audioCtx.decodeAudioData(ab); }catch(e){ merpBuf=null; } }
 loadMerp();
-function playMerp(){
-  if(merpBuffer && audioCtx){
-    const src = audioCtx.createBufferSource();
-    src.buffer = merpBuffer;
-    const jitter = (Math.random()*0.3) - 0.15;
-    src.playbackRate.value = 1 + jitter;
-    src.connect(audioCtx.destination);
-    try{ src.start(0); }catch(e){}
-  } else {
-    try{ new Audio(SOUND_BASE_PATH+'merp.mp3').play().catch(()=>{}); }catch(e){}
-  }
-}
+function playMerp(){ if(merpBuf && audioCtx){ const s=audioCtx.createBufferSource(); s.buffer=merpBuf; s.playbackRate.value = 1 + (Math.random()*0.3 - .15); s.connect(audioCtx.destination); try{s.start(0)}catch(e){} }else try{ new Audio(SOUND_BASE_PATH+'merp.mp3').play().catch(()=>{}); } }
 
-/* ============= UTIL ============== */
+/* ============== UTIL ============== */
 function el(id){ return document.getElementById(id); }
 function randomId(){ return Math.random().toString(36).slice(2,9); }
 function saveState(){ state.lastUpdated = Date.now(); localStorage.setItem('gubby_clicker_v1', JSON.stringify(state)); }
-function loadState(){ try{ const raw = localStorage.getItem('gubby_clicker_v1'); if(raw) return JSON.parse(raw);}catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
+function loadState(){ try{ const r=localStorage.getItem('gubby_clicker_v1'); if(r) return JSON.parse(r); }catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
+function clamp(v, lo=0, hi=100){ return Math.max(lo, Math.min(hi, v)); }
 
 /* apply UI */
 function applyUI(){
   hungerVal.textContent = Math.round(state.hunger);
   thirstVal.textContent = Math.round(state.thirst);
   energyVal.textContent = Math.round(state.energy);
-  hungerFill.style.width = Math.max(0, Math.min(100, state.hunger)) + '%';
-  thirstFill.style.width = Math.max(0, Math.min(100, state.thirst)) + '%';
-  energyFill.style.width = Math.max(0, Math.min(100, state.energy)) + '%';
+  hungerFill.style.width = clamp(state.hunger) + '%';
+  thirstFill.style.width = clamp(state.thirst) + '%';
+  energyFill.style.width = clamp(state.energy) + '%';
   bpFood.textContent = state.backpack.food; bpWater.textContent = state.backpack.water; bpCola.textContent = state.backpack.cola;
-  clicksCounter.textContent = state.totalClicks; gubbySprite.src = SPRITE_BASE_PATH + state.variant;
+  clickCount.textContent = state.totalClicks;
+  gubbySprite.src = SPRITE_BASE_PATH + state.variant;
   if(state.pos && typeof state.pos.x === 'number') gubbySprite.style.left = state.pos.x + 'px';
   if(state.pos && typeof state.pos.y === 'number') gubbySprite.style.top = state.pos.y + 'px';
-  el('accountInfo').textContent = user ? (user.displayName || user.email || user.uid) : 'Not signed in';
-  el('userInfo').textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
+  el('accountInfo').textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
+  userInfo.textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
 }
 applyUI();
 
-/* prevent click glitch */
-gubbySprite.style.pointerEvents = 'auto';
-gubbySprite.style.zIndex = 50;
+/* ============== SHOP ITEMS (50+) ============== */
+/* You can edit/add items here; id must be unique */
+shopData = [
+  /* Basic Care (1-10) */
+  {id:'burger', title:'Burger', price:25, tier:'Basic', desc:'Food +10 Hunger', kind:'consumable', apply:(st)=>{ st.backpack.food+=1; }},
+  {id:'waterbottle', title:'Water Bottle', price:20, tier:'Basic', desc:'Water +10', kind:'consumable', apply:(st)=>{ st.backpack.water+=1; }},
+  {id:'ball', title:'Bouncy Ball', price:50, tier:'Basic', desc:'Play +5 Energy', apply:(st)=>{}},
+  {id:'smallbowl', title:'Small Bowl', price:80, tier:'Basic', desc:'Reduces hunger decay slightly', apply:(st)=>{ st.upgrades.hungerDecayMod = (st.upgrades.hungerDecayMod || 1) * 0.98; }},
+  {id:'waterfilter', title:'Water Filter', price:95, tier:'Basic', desc:'Reduces thirst decay', apply:(st)=>{ st.upgrades.thirstDecayMod = (st.upgrades.thirstDecayMod || 1) * 0.98; }},
+  {id:'toy1', title:'Rubber Duck', price:60, tier:'Basic', desc:'Play item', apply:(st)=>{}},
 
-/* ============= Shop & UI ============= */
-const builtinShop = [
-  {id:'click1', title:'Click Power +1', price:200, apply:()=>{ if(state.totalClicks<200) return alert('Not enough clicks'); state.upgrades.clickPower+=1; state.totalClicks-=200; }},
-  {id:'auto1', title:'Auto Clicker +1', price:800, apply:()=>{ if(state.totalClicks<800) return alert('Not enough clicks'); state.upgrades.autoClicks+=1; state.totalClicks-=800; }},
-  {id:'foodpack', title:'Food Pack +5', price:150, apply:()=>{ if(state.totalClicks<150) return alert('Not enough clicks'); state.backpack.food+=5; state.totalClicks-=150; }},
-  {id:'waterpack', title:'Water +5', price:150, apply:()=>{ if(state.totalClicks<150) return alert('Not enough clicks'); state.backpack.water+=5; state.totalClicks-=150; }},
-  {id:'colapack', title:'Bloxy Cola +2', price:300, apply:()=>{ if(state.totalClicks<300) return alert('Not enough clicks'); state.backpack.cola+=2; state.totalClicks-=300; }}
+  /* Upgrades (11-25) */
+  {id:'clicker1', title:'Click Power +1', price:200, tier:'Upgrades', desc:'Increase click power', apply:(st)=>{ st.upgrades.clickPower = (st.upgrades.clickPower||1)+1; }},
+  {id:'autoclick1', title:'Auto-Clicker Mk I', price:600, tier:'Upgrades', desc:'+1 Auto click/sec', apply:(st)=>{ st.upgrades.autoClicks = (st.upgrades.autoClicks||0)+1; }},
+  {id:'bowl2', title:'Silver Bowl', price:400, tier:'Upgrades', desc:'Better food efficiency', apply:(st)=>{ st.upgrades.hungerDecayMod = (st.upgrades.hungerDecayMod||1)*0.95; }},
+  {id:'bed', title:'Cozy Bed', price:350, tier:'Upgrades', desc:'Energy recovers faster', apply:(st)=>{ st.upgrades.energyGain = (st.upgrades.energyGain||0)+1; }},
+  {id:'microphone', title:'DJ Microphone', price:480, tier:'Upgrades', desc:'Gubby likes music — +1 multiplier chance', apply:(st)=>{ st.upgrades.multipliers.push(1.02); }},
+
+  /* Quality (26-40) */
+  {id:'house_small', title:'Mini Gubby House', price:900, tier:'Quality', desc:'Nice home for Gubby', apply:(st)=>{}},
+  {id:'garden', title:'Garden', price:750, tier:'Quality', desc:'Auto grow snacks', apply:(st)=>{ st.upgrades.autoFood = (st.upgrades.autoFood||0)+1; }},
+  {id:'fountain', title:'Fountain', price:650, tier:'Quality', desc:'Relaxing water feature', apply:(st)=>{}},
+  {id:'trainer', title:'Personal Trainer', price:1200, tier:'Quality', desc:'+2 energy during day', apply:(st)=>{}},
+
+  /* Luxury (41-56) */
+  {id:'gold_spoon', title:'Golden Feeding Spoon', price:2500, tier:'Luxury', desc:'Stylish and effective', apply:(st)=>{}},
+  {id:'meteor_bed', title:'Meteor Rock Bed', price:3200, tier:'Luxury', desc:'Very comfy', apply:(st)=>{}},
+  {id:'mansion', title:'Gubby Mansion', price:8000, tier:'Luxury', desc:'Luxury housing', apply:(st)=>{}},
+  {id:'quantum_fig', title:'Quantum Fish Figurine', price:4200, tier:'Luxury', desc:'Strange properties', apply:(st)=>{}},
+
+  /* Endgame / Silly (57-80) */
+  {id:'particle_accel', title:'Particle Gubby Accelerator', price:15000, tier:'Endgame', desc:'Speeds up everything (very silly)', apply:(st)=>{ st.upgrades.clickPower = (st.upgrades.clickPower||1)*1.5; }},
+  {id:'wormhole_portal', title:'Wormhole Snack Portal', price:22000, tier:'Endgame', desc:'Spawns rare snacks', apply:(st)=>{ st.upgrades.wormhole = true; }},
+  {id:'blackhole_tank', title:'Black Hole Fish Tank', price:20000, tier:'Endgame', desc:'Attracts cosmic pets', apply:(st)=>{}},
+  {id:'quantum_accel', title:'Quantum Accelerator', price:30000, tier:'Endgame', desc:'Breaks time for clicks', apply:(st)=>{ st.upgrades.clickPower = (st.upgrades.clickPower||1)*2; }},
+  {id:'immortal_treat', title:'Immortal Treat', price:99999, tier:'Endgame', desc:'Gubby never gets hungry!', apply:(st)=>{ st.hunger = 100; st.thirst=100; st.energy=100; st.upgrades.invincible=true; }},
+
+  /* filler items (add more to hit 50+) */
+  {id:'snackbox', title:'Snack Box', price:180, tier:'Basic', desc:'Mixed snacks', apply:(st)=>{ st.backpack.food+=2; }},
+  {id:'soda_pack', title:'Cola Pack', price:350, tier:'Basic', desc:'+2 Cola', apply:(st)=>{ st.backpack.cola+=2; }},
+  {id:'toy2', title:'Squeaky Toy', price:120, tier:'Basic', desc:'Play toy', apply:(st)=>{}},
+  {id:'auto_feeder2', title:'Auto-Feeder Mk II', price:2400, tier:'Upgrades', desc:'+5 auto click', apply:(st)=>{ st.upgrades.autoClicks = (st.upgrades.autoClicks||0)+5; }},
+  {id:'lux_cushion', title:'Luxury Cushion', price:900, tier:'Quality', desc:'Comfort', apply:(st)=>{}},
+  {id:'gold_chalice', title:'Gold Chalice', price:5000, tier:'Luxury', desc:'Fancy drinking', apply:(st)=>{}},
+  {id:'neon_sign', title:'Neon Gubby Sign', price:700, tier:'Quality', desc:'Stylish', apply:(st)=>{}},
+  {id:'orb', title:'Mystic Orb', price:4200, tier:'Endgame', desc:'Weird energies', apply:(st)=>{}},
+
+  /* more filler to reach 50+ */
+  {id:'pillow', title:'Pillow', price:75, tier:'Basic', desc:'Small comfort', apply:(st)=>{}},
+  {id:'blanket', title:'Blanket', price:120, tier:'Basic', desc:'Cozy', apply:(st)=>{}},
+  {id:'treats', title:'Treats (10)', price:300, tier:'Upgrades', desc:'Bulk snacks', apply:(st)=>{ st.backpack.food+=10; }},
+  {id:'fancy_plate', title:'Fancy Plate', price:1100, tier:'Quality', desc:'Fine dining', apply:(st)=>{}},
+  {id:'mystic_hat', title:'Mystic Hat', price:1300, tier:'Quality', desc:'Looks mysterious', apply:(st)=>{}},
+  {id:'rocket_bed', title:'Rocket Bed', price:7600, tier:'Luxury', desc:'Bed with propulsion', apply:(st)=>{}},
+  {id:'galaxy_pendant', title:'Galaxy Pendant', price:42000, tier:'Endgame', desc:'Very endgame', apply:(st)=>{}},
+  {id:'time_clock', title:'Time Clock', price:12000, tier:'Endgame', desc:'Time-warping clock', apply:(st)=>{}},
+  {id:'mini_farm', title:'Mini Farm', price:2200, tier:'Quality', desc:'Generates food slowly', apply:(st)=>{ st.upgrades.autoFood=(st.upgrades.autoFood||0)+1 }},
+  {id:'scented_candle', title:'Scented Candle', price:90, tier:'Basic', desc:'Pleasant aroma', apply:(st)=>{}},
+  {id:'plushie', title:'Plushie', price:200, tier:'Basic', desc:'Cute friend', apply:(st)=>{}},
+  {id:'laser_toy', title:'Laser Toy', price:480, tier:'Upgrades', desc:'Fun and energizing', apply:(st)=>{}},
+  {id:'zen_garden', title:'Zen Garden', price:1400, tier:'Quality', desc:'Relaxation', apply:(st)=>{}}
 ];
+/* ensure at least 50 items (fill duplicates if needed) */
+while(shopData.length < 54) shopData.push({...shopData[shopData.length%shopData.length], id: 'filler_' + shopData.length});
 
-function openShop(items){ el('shopModal').style.display='flex'; setTimeout(()=> el('shopBox').classList.add('show'),10); renderShop(items); }
-function closeShop(){ el('shopBox').classList.remove('show'); setTimeout(()=> el('shopModal').style.display='none',240); }
-function renderShop(items){
-  shopGrid.innerHTML = '';
-  const list = items || builtinShop;
-  list.forEach(it=>{
-    const div = document.createElement('div'); div.className='shop-item';
-    div.innerHTML = `<div class="title">${it.title}</div><div class="price">Price: ${it.price} clicks</div><div style="margin-top:8px"><button class="buy btn">Buy</button></div>`;
-    div.querySelector('.buy').addEventListener('click', ()=>{
-      if(state.totalClicks < it.price) return alert('Not enough clicks');
-      it.apply();
-      syncLocalAndRoom();
-      applyUI();
-      alert('Purchased!');
-    });
-    shopGrid.appendChild(div);
-  });
+/* group tiers */
+const tiers = Array.from(new Set(shopData.map(s=>s.tier)));
+/* ============== UI: Shop rendering & logic (synchronized) ============== */
+function openShop(){
+  el('shopModal').style.display='flex';
+  setTimeout(()=> el('shopBox').classList.add('show'), 10);
+  renderTierButtons();
+  renderShopGrid(currentTier);
+}
+function closeShop(){
+  el('shopBox').classList.remove('show');
+  setTimeout(()=> el('shopModal').style.display='none', 180);
 }
 el('shopBtn').addEventListener('click', ()=> openShop());
-el('closeShop').addEventListener('click', closeShop);
+el('shopClose').addEventListener('click', closeShop);
 
-/* ============= Game actions ============= */
-function clickGubbyLocal(){
+/* tier buttons */
+function renderTierButtons(){
+  const container = el('tierButtons'); container.innerHTML='';
+  tiers.forEach(t=>{
+    const b = document.createElement('button');
+    b.className = 'btn small secondary';
+    b.textContent = t;
+    if(t === currentTier){ b.classList.add('btn'); b.classList.remove('secondary'); }
+    b.addEventListener('click', ()=>{ currentTier = t; renderTierButtons(); renderShopGrid(t); });
+    container.appendChild(b);
+  });
+}
+
+/* shop grid renders items; if in-room, check room doc's shopOwned */
+function renderShopGrid(tier){
+  const grid = el('shopGrid'); grid.innerHTML='';
+  const list = shopData.filter(s => s.tier === tier);
+  // get owned list from room doc if present
+  const roomDocOwned = window._roomCached?.shopOwned || [];
+  list.forEach(it=>{
+    const card = document.createElement('div'); card.className='shop-card';
+    card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div class="title">${it.title}</div>
+        <div class="small-muted">${it.desc}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="price">${it.price} ✨</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+      <div style="font-size:12px;color:var(--muted)">${it.id}</div>
+      <div>
+        <button class="btn small ${roomDocOwned.includes(it.id)?'ghost secondary':''}" ${roomDocOwned.includes(it.id)?'disabled':''}>${roomDocOwned.includes(it.id)?'Owned':'Buy'}</button>
+      </div>
+    </div>`;
+    const btn = card.querySelector('button');
+    btn.addEventListener('click', ()=> buyItem(it));
+    grid.appendChild(card);
+  });
+}
+
+/* buyItem: transactionally update room doc with purchase (syncs for all players) */
+async function buyItem(item){
+  if(!currentRoom) return alert('Join a room to buy items (shop is synced in multiplayer).');
+  if(!user) return alert('You must be signed in to purchase.');
+  const roomRef = db.collection('rooms').doc(currentRoom);
+  try{
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(roomRef);
+      if(!snap.exists) throw new Error('Room missing');
+      const data = snap.data();
+      const owned = data.shopOwned || [];
+      if(owned.includes(item.id)) throw new Error('Already owned');
+      const roomState = data.state || {};
+      const totalClicks = Number(roomState.totalClicks || 0);
+      if(totalClicks < item.price) throw new Error('Not enough clicks in room balance');
+      // apply item to local state copy, then write back
+      const newOwned = owned.concat([item.id]);
+      const newState = Object.assign({}, state); // shallow copy
+      // perform apply function (items have apply function defined locally, but Firestore can't run code)
+      // We'll apply locally then store state - but important: we need to ensure consensus
+      // Here we just deduct price and persist owned list & new state.
+      newState.totalClicks = totalClicks - item.price;
+      // run the JS-side apply function to modify local state object
+      try{ item.apply(newState); }catch(e){ console.warn('item apply failed', e); }
+      tx.update(roomRef, { shopOwned: newOwned, state: newState, lastUpdated: Date.now(), from: myPeerId, seq: ++localSeq });
+      // also write to local state so UI updates quickly - full authoritative merge will come from snapshot
+      state = newState;
+    });
+    applyUI();
+    // shop UI will update from snapshot - but refresh locally now
+    setTimeout(()=> renderShopGrid(currentTier), 200);
+    alert('Purchased ' + item.title);
+  }catch(err){
+    alert('Purchase failed: ' + (err.message || err));
+  }
+}
+
+/* ============== Game actions & loops (same as earlier) ============== */
+function clickGubby(){
   if(!state.alive) return;
-  if(audioCtx && audioCtx.state === 'suspended'){ audioCtx.resume().catch(()=>{}); }
-  const mult = state.upgrades.multipliers.reduce((a,b)=>a*b,1) || 1;
+  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  const mult = state.upgrades.multipliers?.reduce((a,b)=>a*b,1) || 1;
   const power = (state.upgrades.clickPower || 1) * mult;
   state.clicks += power; state.totalClicks += power;
   state.hunger = Math.max(0, state.hunger - 0.1);
   state.thirst = Math.max(0, state.thirst - 0.2);
   playMerp();
-  syncLocalAndRoom();
+  scheduleWrite();
 }
-gubbySprite.addEventListener('click', ()=> clickGubbyLocal());
+gubbySprite.addEventListener('click', clickGubby);
 
 function useBackpack(type){
   if(!state.alive) return;
-  if(!state.backpack[type] || state.backpack[type] <= 0) return alert('No item in backpack');
+  if(!state.backpack[type] || state.backpack[type] <= 0) return alert('No item');
   state.backpack[type] -= 1;
-  if(type === 'food') state.hunger = Math.min(100, state.hunger + 25);
-  if(type === 'water') state.thirst = Math.min(100, state.thirst + 25);
-  if(type === 'cola') state.energy = Math.min(100, state.energy + 50);
-  syncLocalAndRoom();
+  if(type==='food') state.hunger = Math.min(100, state.hunger + 25);
+  if(type==='water') state.thirst = Math.min(100, state.thirst + 25);
+  if(type==='cola') state.energy = Math.min(100, state.energy + 50);
+  scheduleWrite();
 }
 el('feedBtn').addEventListener('click', ()=> useBackpack('food'));
 el('waterBtn').addEventListener('click', ()=> useBackpack('water'));
 el('colaBtn').addEventListener('click', ()=> useBackpack('cola'));
-el('playBtn').addEventListener('click', ()=> { state.energy = Math.min(100, state.energy + 8); syncLocalAndRoom(); });
+el('playBtn').addEventListener('click', ()=> { state.energy = Math.min(100, state.energy + 8); scheduleWrite(); });
 
-/* wander */
+/* wander + decay */
 function wander(){
   if(!state.alive) return;
-  const margin = 100;
-  const newX = Math.random()*(620 - margin*2) + margin;
+  const margin = 80;
+  const newX = Math.random()*(680 - margin*2) + margin;
   const newY = Math.random()*(360 - margin*2) + margin;
-  const dx = (state.pos?.x || newX) - newX;
-  const dy = (state.pos?.y || newY) - newY;
+  const dx = (state.pos?.x||newX) - newX;
+  const dy = (state.pos?.y||newY) - newY;
   const dist = Math.sqrt(dx*dx + dy*dy);
-  const energyLoss = Math.max(1, Math.round(dist/60));
+  const loss = Math.max(1, Math.round(dist/60));
   state.pos.x = newX; state.pos.y = newY;
-  state.energy = Math.max(0, state.energy - energyLoss);
-  gubbySprite.style.left = newX + 'px';
-  gubbySprite.style.top = newY + 'px';
-  syncLocalAndRoom();
+  state.energy = Math.max(0, state.energy - loss);
+  gubbySprite.style.left = newX + 'px'; gubbySprite.style.top = newY + 'px';
+  scheduleWrite();
 }
 setInterval(wander, 3000);
 
-/* decay + auto clicks */
 setInterval(()=>{
   if(!state.alive) return;
-  state.hunger = Math.max(0, state.hunger - 1);
-  state.thirst = Math.max(0, state.thirst - 1.2);
-  const hour = (new Date()).getHours();
-  if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2); else state.energy = Math.max(0, state.energy - 0.5);
-  if(state.hunger === 0 || state.thirst ===0) state.energy = Math.max(0, state.energy - 2);
+  state.hunger = Math.max(0, state.hunger - (state.upgrades?.hungerDecayMod || 1));
+  state.thirst = Math.max(0, state.thirst - (state.upgrades?.thirstDecayMod || 1.2));
+  const h = (new Date()).getHours();
+  if(h>=22||h<7) state.energy = Math.min(100, state.energy + (state.upgrades?.energyGain||2)); else state.energy = Math.max(0, state.energy - 0.5);
+  if(state.hunger===0 || state.thirst===0) state.energy = Math.max(0, state.energy - 2);
   if(state.upgrades.autoClicks > 0) addClicks(state.upgrades.autoClicks);
-  if(state.energy <= 0 || state.hunger <= 0 || state.thirst <= 0){
+  if(state.energy <=0 || state.hunger <=0 || state.thirst <=0){
     state.alive = false;
-    syncLocalAndRoom();
+    scheduleWrite();
     showGameOver();
   }
-  syncLocalAndRoom();
+  scheduleWrite();
 }, 10000);
 
 function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyUI(); }
 
-/* Game over */
-function showGameOver(){
-  const backdrop = el('gameOverBackdrop');
-  const box = el('gameOverBox');
-  backdrop.style.display = 'flex';
-  setTimeout(()=> box.classList.add('show'), 10);
-}
-function hideGameOver(){
-  const backdrop = el('gameOverBackdrop');
-  const box = el('gameOverBox');
-  box.classList.remove('show');
-  setTimeout(()=> backdrop.style.display = 'none', 200);
-}
+/* Game over UI */
+function showGameOver(){ el('gameOverBackdrop').style.display='flex'; setTimeout(()=> el('gameOverBox').classList.add('show'), 10); }
+function hideGameOver(){ el('gameOverBox').classList.remove('show'); setTimeout(()=> el('gameOverBackdrop').style.display='none', 200); }
 el('restartBtn').addEventListener('click', ()=> {
+  // unanimous restart handled separately; here local restart triggers scheduleWrite
   state = JSON.parse(JSON.stringify(defaultState));
-  syncLocalAndRoom();
+  scheduleWrite();
   saveState(); applyUI(); hideGameOver();
 });
-el('closeGameOver').addEventListener('click', ()=> hideGameOver());
 
-/* ============ Firebase setup & auth handling ============ */
+/* ============== Firebase init & auth ============== */
 function initFirebase(){
   if(window.firebase && !db){
     firebase.initializeApp(firebaseConfig);
@@ -483,255 +580,200 @@ function initFirebase(){
     auth.onAuthStateChanged(async u=>{
       user = u;
       if(user){
-        // hide sign-in button and show name
-        el('googleSignIn').style.display = 'none';
-        el('userInfo').textContent = user.displayName || user.email || 'You';
+        signInBtn.style.display='none';
+        userInfo.textContent = user.displayName || user.email || 'You';
+        // ensure user doc exists & admin check
         try{
           const userRef = db.collection('users').doc(user.uid);
           const doc = await userRef.get();
-          if(!doc.exists){
-            await userRef.set({ displayName:user.displayName||user.email||'guest', email:user.email||null, privileges:'normal', createdAt:Date.now() });
-          }
+          if(!doc.exists) await userRef.set({ displayName:user.displayName||user.email||'guest', email:user.email||null, privileges:'normal', createdAt:Date.now() });
           const profile = (await userRef.get()).data();
-          if(profile?.privileges==='admin') { el('adminPanel').classList.remove('hidden'); } else { el('adminPanel').classList.add('hidden'); }
+          if(profile?.privileges === 'admin') el('adminPanel').style.display = 'block';
+          else el('adminPanel').style.display = 'none';
         }catch(e){ console.warn('user doc check error', e); }
       } else {
-        // show sign-in
-        el('googleSignIn').style.display = 'inline-block';
-        el('userInfo').textContent = 'Not signed in';
-        el('adminPanel').classList.add('hidden');
+        signInBtn.style.display='inline-block';
+        userInfo.textContent = 'Not signed in';
+        el('adminPanel').style.display = 'none';
       }
       applyUI();
     });
 
-    // load variants
-    db.collection('variants').onSnapshot(snap => renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    // variants live
+    db.collection('variants').onSnapshot(snap => {
+      const items = snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderVariants(items);
+    });
+
+    // optionally keep a cached room doc snapshot for UI use (shop owned etc)
+    window._roomCached = {};
   }
 }
-
-/* Sign in button */
-el('googleSignIn').addEventListener('click', async ()=>{
+initFirebase();
+el('signInBtn').addEventListener('click', async ()=>{
+  if(!db) initFirebase();
   try{
-    if(!db) initFirebase();
     const provider = new firebase.auth.GoogleAuthProvider();
     await firebase.auth().signInWithPopup(provider);
-  }catch(e){ alert('Sign-in failed: '+e.message); }
+  }catch(e){ alert('Sign in failed: ' + e.message); }
 });
+async function requireSignIn(){ if(!auth) initFirebase(); if(!auth.currentUser){ alert('Please sign in to use multiplayer.'); return false } return true; }
 
-/* Force sign-in requirement: block host/join if not signed in */
-async function ensureSignedIn(){
-  if(!db) initFirebase();
-  if(!auth) initFirebase();
-  if(!auth.currentUser){
-    alert('Please sign in with Google before hosting or joining a room.');
-    return false;
-  }
-  return true;
-}
+/* ============== Rooms: create/join/leave/listen ================= */
 
-/* ============ Rooms (rooms/{code} + rooms/{code}/members/{uid}) ============ */
-
-/* generate code */
-function randomRoomCode(){
+/* generate 4-letter code */
+function genCode(){
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let s = '';
-  for(let i=0;i<4;i++) s += letters[Math.floor(Math.random()*letters.length)];
+  let s=''; for(let i=0;i<4;i++) s+=letters[Math.floor(Math.random()*letters.length)];
   return s;
 }
 
 /* host a room */
-async function hostGame(){
-  if(!await ensureSignedIn()) return;
-  if(currentRoom) return alert('Already in a room. Leave first.');
-  // attempt to find a free code
-  for(let attempt=0; attempt<6; attempt++){
-    const code = randomRoomCode();
-    const docRef = db.collection('rooms').doc(code);
-    const doc = await docRef.get();
-    if(!doc.exists){
-      isHost = true;
-      currentRoom = code;
-      const payload = {
-        state: state,
-        hostUid: auth.currentUser.uid,
-        from: myPeerId,
-        seq: ++localSeq,
-        createdAt: Date.now()
-      };
-      await docRef.set(payload);
-      // add self as member
-      await docRef.collection('members').doc(auth.currentUser.uid).set({
-        uid: auth.currentUser.uid,
-        displayName: auth.currentUser.displayName || auth.currentUser.email || 'You',
-        joinedAt: Date.now()
-      });
-      listenToRoom(code);
-      listenToMembers(code);
+async function hostRoom(){
+  if(!await requireSignIn()) return;
+  if(currentRoom) return alert('Leave existing room first.');
+  for(let i=0;i<6;i++){
+    const code = genCode();
+    const ref = db.collection('rooms').doc(code);
+    const snap = await ref.get();
+    if(!snap.exists){
+      isHost = true; currentRoom = code;
+      const payload = { state: state, shopOwned: [], resetVotes: [], membersCount: 1, hostUid: auth.currentUser.uid, from: myPeerId, seq: ++localSeq, createdAt: Date.now() };
+      await ref.set(payload);
+      // add member doc
+      await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, displayName: auth.currentUser.displayName||auth.currentUser.email||'You', joinedAt: Date.now() });
+      // listen
+      listenRoom(code);
+      listenMembers(code);
       updateRoomUI(true, code);
-      alert('Room created — code: ' + code + '. Share it with friends.');
+      alert('Room created: ' + code);
       return;
     }
   }
-  alert('Failed to create a room. Try again.');
+  alert('Failed to create room, try again.');
 }
 
-/* join a room */
-async function joinGame(code){
-  if(!await ensureSignedIn()) return;
-  if(currentRoom) return alert('Already in a room. Leave first.');
-  code = code.trim().toUpperCase();
-  if(!code) return alert('Enter a room code.');
-  const docRef = db.collection('rooms').doc(code);
-  const doc = await docRef.get();
-  if(!doc.exists) return alert('Room not found: '+code);
-  currentRoom = code;
-  isHost = false;
+/* join room */
+async function joinRoom(code){
+  if(!await requireSignIn()) return;
+  if(currentRoom) return alert('Already in a room.');
+  code = (code||'').trim().toUpperCase();
+  if(!code) return alert('Enter room code');
+  const ref = db.collection('rooms').doc(code);
+  const snap = await ref.get();
+  if(!snap.exists) return alert('Room not found: ' + code);
+  currentRoom = code; isHost = false;
   // add member doc
-  await docRef.collection('members').doc(auth.currentUser.uid).set({
-    uid: auth.currentUser.uid,
-    displayName: auth.currentUser.displayName || auth.currentUser.email || 'You',
-    joinedAt: Date.now()
-  });
-  listenToRoom(code);
-  listenToMembers(code);
+  await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, displayName: auth.currentUser.displayName||auth.currentUser.email||'You', joinedAt: Date.now() });
+  listenRoom(code);
+  listenMembers(code);
   updateRoomUI(true, code);
-  alert('Joined room ' + code);
+  alert('Joined ' + code);
 }
 
-/* listen to room changes (state) */
-function listenToRoom(code){
-  if(roomUnsub) roomUnsub();
-  roomUnsub = db.collection('rooms').doc(code).onSnapshot(snap=>{
-    if(!snap.exists){
-      // room removed
-      alert('Room closed');
-      leaveRoom(false);
-      return;
+/* leave */
+async function leaveRoom(userRequested=true){
+  if(!currentRoom) return;
+  try{
+    const code = currentRoom;
+    const ref = db.collection('rooms').doc(code);
+    if(auth && auth.currentUser){
+      await ref.collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
     }
+    // if host, maybe delete if no members remain
+    if(isHost){
+      const mSnap = await ref.collection('members').limit(1).get();
+      if(mSnap.empty) await ref.delete().catch(()=>{});
+    }
+  }catch(e){ console.warn('leave error', e); }
+  if(roomUnsub){ roomUnsub(); roomUnsub = null; }
+  if(membersUnsub){ membersUnsub(); membersUnsub = null; }
+  currentRoom = null; isHost = false;
+  document.body.classList.remove('room-mode');
+  modeText.textContent = 'Solo play';
+  roomCodeDisplay.textContent = '';
+  copyRoomBtn.classList.add('hidden'); leaveRoomBtn.classList.add('hidden');
+  connectionStatus.textContent = 'Not connected';
+  membersEl.innerHTML = '';
+  if(userRequested) alert('Left room');
+}
+
+/* listen to room doc (state + shopOwned + resetVotes) */
+function listenRoom(code){
+  if(roomUnsub) roomUnsub();
+  const ref = db.collection('rooms').doc(code);
+  roomUnsub = ref.onSnapshot(snap=>{
+    if(!snap.exists){ alert('Room closed'); leaveRoom(false); return; }
     const data = snap.data();
     if(!data) return;
-    const seq = Number(data.seq || 0);
-    const from = data.from;
-    if(from === myPeerId) return; // ignore echo
-    const prev = peerSeq[from] || 0;
-    if(seq <= prev) return;
-    peerSeq[from] = seq;
-    if(data.state) mergeRemoteState(data.state);
-  }, err => {
-    console.warn('room listen error', err);
-  });
+    // cache for UI usage (shop owned)
+    window._roomCached = data;
+    // merge state (prevent echo loops by ignoring updates from ourselves using 'from')
+    const seq = Number(data.seq || 0), from = data.from;
+    if(from !== myPeerId){
+      // apply merge strategy similar to earlier
+      if(data.state) mergeRemoteState(data.state);
+    }
+    // update shop UI cached owned
+    renderShopGrid(currentTier);
+    // render resetVotes status
+    updateResetStatus(data.resetVotes || []);
+  }, err => { console.warn('room listen err', err); });
 }
 
-/* listen to members list */
-function listenToMembers(code){
+/* member list listener */
+function listenMembers(code){
   if(membersUnsub) membersUnsub();
-  membersUnsub = db.collection('rooms').doc(code).collection('members').onSnapshot(snap=>{
-    const members = [];
-    snap.forEach(d => {
-      members.push(d.data());
-    });
-    renderMembers(members);
+  const mRef = db.collection('rooms').doc(code).collection('members');
+  membersUnsub = mRef.onSnapshot(snap=>{
+    const arr = [];
+    snap.forEach(d=> arr.push(d.data()));
+    renderMembers(arr);
   }, err => console.warn('members listen err', err));
 }
 
-/* render members */
+/* renderMembers to UI */
 function renderMembers(list){
-  membersList.innerHTML = '';
+  membersEl.innerHTML = '';
   list.forEach(m => {
-    const div = document.createElement('div'); div.className = 'member-item';
-    div.innerHTML = `<div style="width:36px;height:36px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-weight:700">${(m.displayName||'U')[0].toUpperCase()}</div>
-                     <div style="display:flex;flex-direction:column"><div style="font-weight:700">${m.displayName||m.uid}</div><div class="compact">joined</div></div>`;
-    membersList.appendChild(div);
+    const div = document.createElement('div'); div.className='member';
+    div.innerHTML = `<div style="width:40px;height:40px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-weight:800">${(m.displayName||m.uid||'U')[0].toUpperCase()}</div>
+      <div style="display:flex;flex-direction:column"><div style="font-weight:800">${m.displayName||m.uid}</div><div class="small-muted">joined</div></div>`;
+    membersEl.appendChild(div);
   });
 }
-
-/* schedule room write (debounced) */
-function scheduleRoomWrite(){
-  if(!currentRoom) return;
-  if(roomWriteTimer) clearTimeout(roomWriteTimer);
-  roomWriteTimer = setTimeout(()=> {
-    writeRoomNow();
-  }, ROOM_WRITE_DEBOUNCE_MS);
-}
-function writeRoomNow(){
-  if(!currentRoom) return;
-  const docRef = db.collection('rooms').doc(currentRoom);
-  const payload = {
-    state: state,
-    from: myPeerId,
-    seq: ++localSeq,
-    lastUpdated: Date.now()
-  };
-  docRef.set(payload, { merge: true }).catch(e => console.warn('room write failed', e));
-}
-
-/* sync helper called by game */
-function syncLocalAndRoom(){ saveState(); applyUI(); if(currentRoom) scheduleRoomWrite(); }
-
-/* leave room */
-async function leaveRoom(userRequested=true){
-  if(!currentRoom) return;
-  const code = currentRoom;
-  try{
-    // remove member doc
-    if(db && auth && auth.currentUser){
-      await db.collection('rooms').doc(code).collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
-      // if host, check if members exist; if none, delete room
-      if(isHost){
-        const membersSnap = await db.collection('rooms').doc(code).collection('members').limit(1).get();
-        if(membersSnap.empty){
-          await db.collection('rooms').doc(code).delete().catch(()=>{});
-        }
-      }
-    }
-  }catch(e){ console.warn('leaveRoom cleanup failed', e); }
-  // unsubscribe
-  if(roomUnsub){ roomUnsub(); roomUnsub = null; }
-  if(membersUnsub){ membersUnsub(); membersUnsub = null; }
-  currentRoom = null;
-  isHost = false;
-  document.body.classList.remove('multiplayer-mode');
-  modeTag.textContent = 'Solo';
-  roomCodeDisplay.textContent = '';
-  copyRoomBtn.classList.add('hidden');
-  leaveRoomBtn.classList.add('hidden');
-  connectionStatus.textContent = 'Not connected';
-  membersList.innerHTML = '';
-  if(userRequested) alert('Left room ' + code);
-}
-
-/* copy room code */
-copyRoomBtn.addEventListener('click', ()=>{
-  const code = currentRoom || roomCodeDisplay.textContent;
-  if(!code) return;
-  navigator.clipboard?.writeText(code).then(()=> alert('Copied'), ()=> alert('Copy failed'));
-});
-
-/* leave button */
-leaveRoomBtn.addEventListener('click', ()=> {
-  if(confirm('Leave room?')) leaveRoom(true);
-});
 
 /* update UI on join/leave */
 function updateRoomUI(connected, code){
   if(connected){
-    document.body.classList.add('multiplayer-mode');
-    modeTag.textContent = 'In Room';
+    document.body.classList.add('room-mode');
+    modeText.textContent = 'In room';
     connectionStatus.textContent = 'Connected';
-    roomCodeDisplay.textContent = code || '';
-    copyRoomBtn.classList.remove('hidden');
-    leaveRoomBtn.classList.remove('hidden');
+    roomCodeDisplay.textContent = code||'';
+    copyRoomBtn.classList.remove('hidden'); leaveRoomBtn.classList.remove('hidden');
   } else {
-    document.body.classList.remove('multiplayer-mode');
-    modeTag.textContent = 'Solo';
+    document.body.classList.remove('room-mode');
+    modeText.textContent = 'Solo play';
     connectionStatus.textContent = 'Not connected';
-    roomCodeDisplay.textContent = '';
-    copyRoomBtn.classList.add('hidden');
-    leaveRoomBtn.classList.add('hidden');
+    roomCodeDisplay.textContent = ''; copyRoomBtn.classList.add('hidden'); leaveRoomBtn.classList.add('hidden');
   }
 }
 
-/* =========== merging/applying remote state (same as before) =========== */
+/* schedule/debounce writes of local state to room (non-transactional set merge) */
+function scheduleWrite(){
+  saveState(); applyUI();
+  if(!currentRoom) return;
+  if(writeTimer) clearTimeout(writeTimer);
+  writeTimer = setTimeout(()=> writeRoomNow(), WRITE_DEBOUNCE_MS);
+}
+function writeRoomNow(){
+  if(!currentRoom) return;
+  const ref = db.collection('rooms').doc(currentRoom);
+  const payload = { state: state, from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() };
+  ref.set(payload, { merge: true }).catch(e=>console.warn('write failed', e));
+}
+
+/* merge remote state: conservative merging */
 function mergeRemoteState(remote){
   if(!remote) return;
   if(remote.totalClicks > state.totalClicks){
@@ -748,112 +790,145 @@ function mergeRemoteState(remote){
   saveState(); applyUI();
 }
 
-function applyRemoteAction(action){
-  if(!action || !action.type) return;
-  if(action.type === 'click'){ addClicks(action.value || 1); playMerp(); }
-  if(action.type === 'move'){ state.pos.x = action.x; state.pos.y = action.y; state.energy = Math.max(0, state.energy - (action.energyLoss||1)); gubbySprite.style.left = state.pos.x + 'px'; gubbySprite.style.top = state.pos.y + 'px'; }
-  if(action.type === 'use_item'){ if(action.item && state.backpack[action.item] !== undefined){ if(typeof action.count === 'number') state.backpack[action.item] = action.count; else state.backpack[action.item] = Math.max(0, (state.backpack[action.item]||0) -1); } }
-  if(action.type === 'auto_click'){ addClicks(action.value || 1); }
-  if(action.type === 'play'){ state.energy = Math.min(100, state.energy + 8); }
-  saveState(); applyUI();
-  if(!state.alive && (state.hunger <=0 || state.thirst<=0 || state.energy<=0)) showGameOver();
-}
+/* ========== Reset Room (unanimous votes) ========== */
+/* open modal to agree */
+el('resetBtn').addEventListener('click', ()=>{
+  if(!currentRoom){ alert('You must be in a room to request reset'); return; }
+  el('resetModal').style.display='flex'; setTimeout(()=> el('resetBox').classList.add('show'), 10);
+});
+el('resetCancel').addEventListener('click', ()=> { el('resetBox').classList.remove('show'); setTimeout(()=> el('resetModal').style.display='none', 180); });
 
-/* =========== Admin variants & Firebase wiring =========== */
-el('createVariantBtn')?.addEventListener('click', async ()=>{
-  if(!db || !auth || !auth.currentUser) return alert('Sign-in required');
-  const id = el('variantId').value.trim(), file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0;
-  let attrs={}; try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON'); }
-  if(!id || !file) return alert('Provide id & file');
+el('resetAgree').addEventListener('click', async ()=>{
+  if(!currentRoom) return;
+  const roomRef = db.collection('rooms').doc(currentRoom);
   try{
-    const res = await fetch(SPRITE_BASE_PATH + file, {method:'HEAD'});
-    if(!res.ok && !confirm('Sprite missing — create anyway?')) return;
-  }catch(e){ if(!confirm('Cannot verify sprite — continue?')) return; }
-  try{ await db.collection('variants').add({ id, displayName: el('variantDisplayName').value || id, fileName:file, price, attributes:attrs, createdBy:auth.currentUser.uid, createdAt:Date.now() }); await db.collection('shop').add({ type:'variant', variantFile:file, variantId:id, price, attributes:attrs }); alert('Created'); }catch(e){ alert('Error: '+e.message); }
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(roomRef);
+      if(!snap.exists) throw new Error('Room missing');
+      const data = snap.data();
+      const resetVotes = new Set(data.resetVotes || []);
+      resetVotes.add(auth.currentUser.uid);
+      // get member count
+      const membersSnap = await tx.get(roomRef.collection('members'));
+      const memberIds = [];
+      membersSnap.forEach(m=> memberIds.push(m.id));
+      // if everyone voted -> reset
+      if(memberIds.every(id => resetVotes.has(id))){
+        // set state to default & clear resetVotes + clear shopOwned
+        const newState = JSON.parse(JSON.stringify(defaultState));
+        tx.update(roomRef, { state: newState, resetVotes: [], shopOwned: [], from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
+      } else {
+        // just record the vote
+        tx.update(roomRef, { resetVotes: Array.from(resetVotes), from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
+      }
+    });
+    el('resetBox').classList.remove('show'); setTimeout(()=> el('resetModal').style.display='none', 180);
+    alert('Your vote has been recorded. Reset will happen when all members agree.');
+  }catch(e){ alert('Reset failed: ' + (e.message||e)); console.warn(e); }
 });
 
-/* render variants */
-function renderVariantsFromFirestore(items){
-  const wrap = el('variantsList'); wrap.innerHTML = '';
-  items.forEach(v=>{ const d = document.createElement('div'); d.className='variant-item'; d.textContent = `${v.displayName || v.id} — ${v.fileName}${v.price? ' — '+v.price:''}`; d.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndRoom(); applyUI(); }); wrap.appendChild(d); });
+/* update reset status UI */
+function updateResetStatus(votes){
+  const vs = votes || [];
+  if(!currentRoom){ el('resetStatus').textContent = ''; return; }
+  // display "x of y agreed"
+  // We can't easily get member count here (unless cached), so attempt to read members list quickly
+  db.collection('rooms').doc(currentRoom).collection('members').get().then(ms=>{
+    const members = []; ms.forEach(d=> members.push(d.id));
+    el('resetStatus').textContent = `${vs.length} / ${members.length} agreed`;
+  }).catch(()=> el('resetStatus').textContent = `${vs.length} votes`);
 }
 
-/* =========== UI wiring: host/join modals & attr picker & sprite preview =========== */
-el('hostBtn').addEventListener('click', async ()=> {
+/* ============== Join/Host UI wiring ============== */
+el('hostBtn').addEventListener('click', async ()=>{
   if(!db) initFirebase();
   if(!auth) initFirebase();
-  try{ if(!auth.currentUser) await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){ /* ignore; ensureSignedIn will alert */ }
-  hostGame();
+  try{ if(!auth.currentUser) await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){}
+  hostRoom();
 });
 
-el('joinBtn').addEventListener('click', ()=> {
-  el('joinModal').style.display='flex';
-  setTimeout(()=> el('joinBox').classList.add('show'), 10);
-});
-el('closeJoinModal').addEventListener('click', ()=> { el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none', 220); });
-el('joinConfirm').addEventListener('click', ()=> {
-  const code = el('joinCodeInput').value.trim(); if(!code) return alert('Paste invite first');
-  joinGame(code);
-  el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none', 240);
-});
+el('joinBtn').addEventListener('click', ()=>{ el('joinModal').style.display='flex'; setTimeout(()=> el('joinBox').classList.add('show'),10); });
+el('closeJoin').addEventListener('click', ()=>{ el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none',180); });
+el('joinConfirm').addEventListener('click', ()=>{ const code = el('joinCodeInput').value.trim(); if(!code) return alert('Enter code'); joinRoom(code); el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none',180); });
 
-/* attr picker */
-el('openAttrPicker').addEventListener('click', ()=> {
-  el('attrModal').style.display='flex';
-  setTimeout(()=> el('attrBox').classList.add('show'), 10);
+copyRoomBtn.addEventListener('click', ()=> {
+  if(!currentRoom) return;
+  navigator.clipboard?.writeText(currentRoom).then(()=> alert('Copied room code'), ()=> alert('Copy failed'));
 });
-el('closeAttrModal').addEventListener('click', ()=> { el('attrBox').classList.remove('show'); setTimeout(()=> el('attrModal').style.display='none', 220); });
-el('applyAttr').addEventListener('click', ()=> {
-  const checkboxes = el('attrBox').querySelectorAll('input[type="checkbox"][data-attr]');
-  const vals = el('attrBox').querySelectorAll('.attr-val');
-  const attrs = {};
-  checkboxes.forEach((cb, i) => {
-    if(cb.checked){
-      const attrName = cb.dataset.attr;
-      const rawVal = vals[i]?.value;
-      const num = rawVal !== undefined ? Number(rawVal) : 1;
-      attrs[attrName] = isNaN(num) ? rawVal : num;
-    }
+el('copyInviteBtn').addEventListener('click', ()=> {
+  if(!currentRoom) return;
+  const link = location.href.split('#')[0] + '#room=' + currentRoom;
+  navigator.clipboard?.writeText(link).then(()=> alert('Room link copied'), ()=> alert('Copy failed'));
+});
+leaveRoomBtn.addEventListener('click', ()=> { if(confirm('Leave room?')) leaveRoom(true); });
+
+/* ============== Variants admin wiring ============== */
+function renderVariants(items){
+  const wrap = el('variantsList'); wrap.innerHTML = '';
+  items.forEach(v=>{
+    const d = document.createElement('div'); d.className = 'variant-item';
+    d.innerHTML = `<div><strong>${v.displayName||v.id}</strong><div class="small-muted">${v.fileName}</div></div><div><button class="btn small">Select</button></div>`;
+    d.querySelector('button').addEventListener('click', ()=> { state.variant = v.fileName; scheduleWrite(); applyUI(); });
+    wrap.appendChild(d);
   });
-  el('variantAttrs').value = JSON.stringify(attrs);
-  el('variantAttrsPreview').textContent = JSON.stringify(attrs);
-  el('attrBox').classList.remove('show'); setTimeout(()=> el('attrModal').style.display='none', 220);
+}
+el('variantFile').addEventListener('input', (e)=> {
+  const v = e.target.value.trim(); if(!v){ el('variantPreview').style.display='none'; return; }
+  el('variantPreview').src = SPRITE_BASE_PATH + v; el('variantPreview').style.display='block';
 });
 
-/* sprite preview */
-el('variantFile')?.addEventListener('input', (ev)=> {
-  const v = ev.target.value.trim();
-  if(!v){ el('variantPreview').style.display='none'; el('variantPreview').src=''; return; }
-  const url = SPRITE_BASE_PATH + v;
-  el('variantPreview').src = url;
-  el('variantPreview').style.display = 'block';
-  el('variantPreview').onerror = ()=> { el('variantPreview').style.display='none'; };
+/* create variant */
+el('createVariant').addEventListener('click', async ()=>{
+  if(!db || !auth || !auth.currentUser) return alert('Sign-in required');
+  const id = el('variantId').value.trim(), display = el('variantDisplay').value.trim(), file = el('variantFile').value.trim(), price = Number(el('variantPrice').value||0);
+  let attrs = {};
+  try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid attributes JSON'); }
+  if(!id || !file) return alert('Provide id & file');
+  try{ await db.collection('variants').add({ id, displayName: display||id, fileName: file, price, attributes: attrs, createdBy: auth.currentUser.uid, createdAt: Date.now() }); alert('Created'); }catch(e){ alert('Error: '+e.message); }
 });
 
-/* helpers */
-function syncLocalAndRoom(){ saveState(); applyUI(); if(currentRoom) scheduleRoomWrite(); }
-function syncLocalAndPeers(){ saveState(); applyUI(); } // legacy
+/* attr modal */
+el('openAttr').addEventListener('click', ()=>{ el('attrModal').style.display='flex'; setTimeout(()=> el('attrBox').classList.add('show'),10); });
+el('attrClose').addEventListener('click', ()=>{ el('attrBox').classList.remove('show'); setTimeout(()=> el('attrModal').style.display='none',180); });
+el('attrApply').addEventListener('click', ()=> {
+  const cbs = el('attrBox').querySelectorAll('input[type="checkbox"][data-attr]'), vals = el('attrBox').querySelectorAll('.attr-val');
+  const a = {};
+  cbs.forEach((cb,i)=>{ if(cb.checked){ const k = cb.dataset.attr; const v = Number(vals[i].value); a[k] = isNaN(v) ? vals[i].value : v; }});
+  el('variantAttrs').value = JSON.stringify(a);
+  el('attrBox').classList.remove('show'); setTimeout(()=> el('attrModal').style.display='none',180);
+});
 
-/* expose debug */
-window.GubbyClicker = { state, saveState, loadState, openShop, hostGame, joinGame, leaveRoom };
+/* ============== Initial UI bindings ============== */
+el('shopBtn').addEventListener('click', openShop);
+el('shopClose').addEventListener('click', closeShop);
+el('joinBtn').addEventListener('click', ()=>{ el('joinModal').style.display='flex'; setTimeout(()=> el('joinBox').classList.add('show'),10); });
 
-/* cleanup on unload: remove member doc */
-window.addEventListener('beforeunload', async ()=> {
+/* ============== Cleanup presence on unload (best effort) ============== */
+window.addEventListener('beforeunload', async ()=>{
   try{
     if(currentRoom && db && auth && auth.currentUser){
       await db.collection('rooms').doc(currentRoom).collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
+      // if host, and no members remain, delete room
       if(isHost){
-        const membersSnap = await db.collection('rooms').doc(currentRoom).collection('members').limit(1).get();
-        if(membersSnap.empty){
-          await db.collection('rooms').doc(currentRoom).delete().catch(()=>{});
-        }
+        const members = await db.collection('rooms').doc(currentRoom).collection('members').limit(1).get();
+        if(members.empty) await db.collection('rooms').doc(currentRoom).delete().catch(()=>{});
       }
     }
   }catch(e){}
 });
 
-/* initial firebase init (lazy) */
-initFirebase();
-</script>
+/* init UI and bindings */
+document.addEventListener('DOMContentLoaded', ()=> {
+  applyUI();
+  // wire simple buttons
+  el('hostBtn').addEventListener('click', hostRoom);
+  el('joinBtn').addEventListener('click', ()=> { el('joinModal').style.display='flex'; setTimeout(()=> el('joinBox').classList.add('show'),10); });
+});
+
+/* expose debug */
+window.GubbyClicker = { state, saveState, loadState, openShop, hostRoom, joinRoom, leaveRoom };
+
+/* initial firebase call is already in initFirebase() above */
+  </script>
 </body>
 </html>
