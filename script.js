@@ -2,9 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, increment, serverTimestamp, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-// This alert is for debugging. If you see this, the script is running.
-alert("Gubby Clicker Script Loaded!");
-
 document.addEventListener('DOMContentLoaded', () => {
     
     // 1. --- FIREBASE CONFIGURATION ---
@@ -368,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     adminBtn.addEventListener('click', () => openModal('admin-panel-modal'));
     
-    addVariantBtn.addEventListener('click', async () => {
+    addVariantBtn.addEventListener('click', async ().
         const name = document.getElementById('variant-name').value;
         const filename = document.getElementById('variant-filename').value;
         const price = parseInt(document.getElementById('variant-price').value);
