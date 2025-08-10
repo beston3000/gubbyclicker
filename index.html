@@ -1,11 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Gubby Clicker — Rooms + Massive Shop</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gubby Clicker — Firestore Multiplayer + Chat</title>
 <style>
-  /* --- Basic responsive layout & palette --- */
   :root{
     --bg:#ffffff; --bg-2:#f5fbff;
     --accent:#6bc8ff; --accent2:#89ddff;
@@ -31,7 +30,6 @@
   @media (max-width:1000px){ .grid{grid-template-columns:1fr 320px} }
   @media (max-width:800px){ .grid{grid-template-columns:1fr} header{flex-direction:column;align-items:stretch} .top-actions{justify-content:flex-end} }
 
-  /* left card */
   .card{border-radius:12px;background:var(--card);padding:14px;box-shadow:0 12px 40px rgba(10,20,40,0.04)}
   .play-area{display:flex;flex-direction:column;gap:12px;align-items:center}
   .house{width:100%;max-width:760px;height:420px;border-radius:10px;background:linear-gradient(180deg,#fff,#f3fbff);position:relative;overflow:hidden;border:1px solid rgba(12,40,80,0.05)}
@@ -46,7 +44,6 @@
 
   .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:6px}
 
-  /* right column */
   .panel{padding:12px;border-radius:12px;background:var(--card);border:1px solid rgba(12,40,80,0.04)}
   .panel h4{margin:0 0 8px 0}
   .variants-list{display:flex;flex-direction:column;gap:8px}
@@ -55,12 +52,10 @@
   .member{display:flex;gap:8px;align-items:center;padding:8px;border-radius:8px;border:1px solid rgba(12,40,80,0.04)}
   .room-code{font-weight:900;font-size:18px}
 
-  /* modal */
   .modal-backdrop{position:fixed;inset:0;background:rgba(8,10,20,0.5);display:none;align-items:center;justify-content:center;z-index:999}
   .modal{width:92%;max-width:980px;background:white;border-radius:12px;padding:18px;box-shadow:0 30px 90px rgba(10,20,40,0.3);transform:translateY(10px);opacity:0;transition:all .18s}
   .modal.show{transform:none;opacity:1}
 
-  /* shop modal grid */
   .shop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   @media (max-width:1100px){ .shop-grid{grid-template-columns:repeat(2,1fr)} }
   @media (max-width:600px){ .shop-grid{grid-template-columns:1fr} }
@@ -69,9 +64,10 @@
   .shop-card .price{font-weight:700;color:var(--muted)}
   .shop-tier{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 
-  /* responsive text sizes */
-  h1{margin:0;font-size:22px}
-  .small-muted{color:var(--muted);font-size:13px}
+  .chat-window{height:420px;display:flex;flex-direction:column;border:1px solid rgba(12,40,80,0.06);border-radius:8px;overflow:hidden}
+  .chat-messages{flex:1;overflow:auto;padding:8px;background:#fbfdff}
+  .chat-input{display:flex;gap:8px;padding:8px;border-top:1px solid rgba(12,40,80,0.04);background:white}
+
   footer{margin-top:12px;text-align:center;color:var(--muted);font-size:12px}
 </style>
 </head>
@@ -81,14 +77,14 @@
       <div class="brand">
         <div class="logo">G</div>
         <div>
-          <h1>Gubby Clicker</h1>
+          <h1 class="title">Gubby Clicker</h1>
           <div class="subtitle" id="modeText">Solo play</div>
         </div>
       </div>
 
       <div class="top-actions" id="topActions">
         <div id="accountArea" style="display:flex;align-items:center;gap:10px">
-          <div id="userInfo" class="small-muted">Not signed in</div>
+          <div id="userInfo" class="subtitle">Not signed in</div>
           <button id="signInBtn" class="btn secondary">Sign in</button>
         </div>
         <button id="shopBtn" class="btn secondary">Shop</button>
@@ -96,7 +92,6 @@
     </header>
 
     <div class="grid">
-      <!-- Left: Game area -->
       <div class="card play-area">
         <div class="house" id="house">
           <img id="gubbySprite" class="gubby gubby-float" src="sprites/variants/default.png" draggable="false" alt="Gubby"/>
@@ -128,19 +123,19 @@
           <button id="hostBtn" class="btn">Host Game</button>
           <button id="joinBtn" class="btn secondary">Join Game</button>
           <button id="resetBtn" class="btn ghost" title="Request a room reset">Reset Room</button>
+          <button id="chatBtn" class="btn small ghost hidden">💬 Chat</button>
         </div>
 
-        <div class="small-muted">Click Gubby to earn clicks. Multiplayer actions sync with players in your room.</div>
+        <div class="subtitle">Click Gubby to earn clicks. Multiplayer actions sync with players in your room.</div>
       </div>
 
-      <!-- Right: panels -->
       <div style="display:flex;flex-direction:column;gap:12px">
         <div class="panel">
           <h4>Connection</h4>
-          <div class="small-muted">Rooms: host a room and share the 4-letter code (login required).</div>
+          <div class="subtitle">Rooms: host & share a 4-letter code (login required).</div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
             <div>
-              <div class="small-muted">Status</div>
+              <div class="subtitle">Status</div>
               <div id="connectionStatus" style="font-weight:800">Not connected</div>
             </div>
             <div style="text-align:right">
@@ -153,19 +148,19 @@
           </div>
 
           <div style="margin-top:12px">
-            <div class="small-muted">Members</div>
+            <div class="subtitle">Members</div>
             <div id="members" class="member-list"></div>
           </div>
 
           <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
             <button id="copyInviteBtn" class="btn small secondary hidden">Copy Room Link</button>
-            <div id="resetStatus" class="small-muted" style="margin-left:auto"></div>
+            <div id="resetStatus" class="subtitle" style="margin-left:auto"></div>
           </div>
         </div>
 
         <div class="panel">
           <h4>Account</h4>
-          <div id="accountInfo" class="small-muted">—</div>
+          <div id="accountInfo" class="subtitle">—</div>
         </div>
 
         <div class="panel">
@@ -192,7 +187,7 @@
       </div>
     </div>
 
-    <footer class="small-muted">Gubby Clicker — Firestore rooms · 50+ synchronized shop items</footer>
+    <footer class="subtitle">Gubby Clicker — Firestore rooms · 50+ synchronized shop items</footer>
   </div>
 
   <!-- Join modal -->
@@ -205,23 +200,41 @@
     </div>
   </div></div>
 
-  <!-- Shop modal (full screen-ish) -->
+  <!-- Shop modal -->
   <div class="modal-backdrop" id="shopModal"><div class="modal" id="shopBox">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <h3>Massive Shop</h3>
       <div style="display:flex;gap:8px;align-items:center">
-        <div class="small-muted">Clicks: <span id="clickCount">0</span></div>
+        <div class="subtitle">Clicks: <span id="clickCount">0</span></div>
         <button id="shopClose" class="btn secondary">Close</button>
       </div>
     </div>
-
     <div style="margin-top:12px">
       <div class="shop-tier" id="tierButtons"></div>
       <div id="shopGrid" class="shop-grid" style="margin-top:12px"></div>
     </div>
   </div></div>
 
-  <!-- Attr picker modal -->
+  <!-- Chat modal -->
+  <div class="modal-backdrop" id="chatModal"><div class="modal" id="chatBox" style="max-width:720px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Room Chat</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div id="chatRoomCode" class="subtitle"></div>
+        <button id="chatClose" class="btn secondary">Close</button>
+      </div>
+    </div>
+    <div style="margin-top:12px" class="chat-window">
+      <div id="chatMessages" class="chat-messages"></div>
+      <div class="chat-input">
+        <input id="chatInput" placeholder="Say something..." style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(12,40,80,0.06)"/>
+        <button id="chatSend" class="btn">Send</button>
+        <button id="chatClear" class="btn ghost small">Clear</button>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- Attr modal -->
   <div class="modal-backdrop" id="attrModal"><div class="modal" id="attrBox">
     <h3>Attributes</h3>
     <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
@@ -235,13 +248,23 @@
     </div>
   </div></div>
 
-  <!-- Reset confirm modal -->
+  <!-- Reset modal -->
   <div class="modal-backdrop" id="resetModal"><div class="modal" id="resetBox">
     <h3>Request Room Reset</h3>
-    <p class="small-muted">All players in the room must agree. When everyone clicks "Agree", the room will reset to default state.</p>
+    <p class="subtitle">All players must agree. When everyone clicks "Agree", the room will reset and chat will be cleared.</p>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button id="resetAgree" class="btn">Agree</button>
       <button id="resetCancel" class="btn secondary">Cancel</button>
+    </div>
+  </div></div>
+
+  <!-- Game Over modal (kept basic) -->
+  <div class="modal-backdrop" id="gameOverBackdrop"><div class="modal" id="gameOverBox">
+    <h3>Game Over</h3>
+    <p class="subtitle">Gubby reached 0 in Hunger, Thirst or Energy for this room.</p>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+      <button id="restartBtn" class="btn">Restart Locally</button>
+      <button id="closeGameOver" class="btn secondary">Close</button>
     </div>
   </div></div>
 
@@ -251,7 +274,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <script>
-/* ================== CONFIG ================== */
+/* ================= CONFIG ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
   authDomain: "gubby-clicker.firebaseapp.com",
@@ -262,9 +285,9 @@ const firebaseConfig = {
   measurementId: "G-R3HFMPH5C4"
 };
 const SPRITE_BASE_PATH = "sprites/variants/";
-const SOUND_BASE_PATH = "sounds/";
+const SOUND_BASE_PATH  = "sounds/";
 
-/* ================== STATE ================== */
+/* ================= STATE ================= */
 const defaultState = {
   name:'Gubby',
   variant:'default.png',
@@ -284,17 +307,27 @@ let db = null;
 const gubbySprite = document.getElementById('gubbySprite');
 const hungerVal = document.getElementById('hungerVal'), thirstVal = document.getElementById('thirstVal'), energyVal = document.getElementById('energyVal');
 const hungerFill = document.getElementById('hungerFill'), thirstFill = document.getElementById('thirstFill'), energyFill = document.getElementById('energyFill');
-const bpFood = document.getElementById('bpFood'), bpWater = document.getElementById('bpWater'), bpCola = document.getElementById('bpCola');
 const clickCount = document.getElementById('clickCount');
 
 /* connection UI */
 const connectionStatus = document.getElementById('connectionStatus'), roomCodeDisplay = document.getElementById('roomCodeDisplay');
 const membersEl = document.getElementById('members'), copyRoomBtn = document.getElementById('copyRoomBtn'), leaveRoomBtn = document.getElementById('leaveRoomBtn');
 const modeText = document.getElementById('modeText'), signInBtn = document.getElementById('signInBtn'), userInfo = document.getElementById('userInfo');
+const chatBtn = document.getElementById('chatBtn');
+
+/* chat refs */
+const chatModal = document.getElementById('chatModal'), chatBox = document.getElementById('chatBox'), chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput'), chatSend = document.getElementById('chatSend'), chatClose = document.getElementById('chatClose');
+const chatClear = document.getElementById('chatClear'), chatRoomCode = document.getElementById('chatRoomCode');
+
+/* modals and controls */
+const shopModal = document.getElementById('shopModal'), shopBox = document.getElementById('shopBox'), shopGrid = document.getElementById('shopGrid'), tierButtons = document.getElementById('tierButtons');
+const joinModal = document.getElementById('joinModal'), joinBox = document.getElementById('joinBox');
 
 let currentRoom = null;
 let roomUnsub = null;
 let membersUnsub = null;
+let messagesUnsub = null;
 let isHost = false;
 let myPeerId = randomId();
 let localSeq = 0;
@@ -302,15 +335,64 @@ const peerSeq = {};
 let writeTimer = null;
 const WRITE_DEBOUNCE_MS = 600;
 
-/* shop state stored per-room */
-let shopData = []; // items list (50+)
-let currentTier = 'Basic';
+/* shop data (50+ items) */
+let shopData = [
+  {id:'burger', title:'Burger', price:25, tier:'Basic', desc:'Food +1 (adds to backpack food)'},
+  {id:'waterbottle', title:'Water Bottle', price:20, tier:'Basic', desc:'Water +1'},
+  {id:'ball', title:'Bouncy Ball', price:50, tier:'Basic', desc:'Play toy'},
+  {id:'smallbowl', title:'Small Bowl', price:80, tier:'Basic', desc:'Slightly reduces hunger decay'},
+  {id:'waterfilter', title:'Water Filter', price:95, tier:'Basic', desc:'Reduces thirst decay'},
+  {id:'toy1', title:'Rubber Duck', price:60, tier:'Basic', desc:'Play item'},
+  {id:'clicker1', title:'Click Power +1', price:200, tier:'Upgrades', desc:'Increase click power'},
+  {id:'autoclick1', title:'Auto-Clicker Mk I', price:600, tier:'Upgrades', desc:'+1 auto click tick'},
+  {id:'bowl2', title:'Silver Bowl', price:400, tier:'Upgrades', desc:'Better food efficiency'},
+  {id:'bed', title:'Cozy Bed', price:350, tier:'Upgrades', desc:'Energy recovers faster'},
+  {id:'microphone', title:'DJ Microphone', price:480, tier:'Upgrades', desc:'Gubby likes music—small multiplier chance'},
+  {id:'house_small', title:'Mini Gubby House', price:900, tier:'Quality', desc:'Nice home'},
+  {id:'garden', title:'Garden', price:750, tier:'Quality', desc:'Auto grow snacks'},
+  {id:'fountain', title:'Fountain', price:650, tier:'Quality', desc:'Relaxing water feature'},
+  {id:'trainer', title:'Personal Trainer', price:1200, tier:'Quality', desc:'+2 energy during day'},
+  {id:'gold_spoon', title:'Golden Feeding Spoon', price:2500, tier:'Luxury', desc:'Stylish and effective'},
+  {id:'meteor_bed', title:'Meteor Rock Bed', price:3200, tier:'Luxury', desc:'Very comfy'},
+  {id:'mansion', title:'Gubby Mansion', price:8000, tier:'Luxury', desc:'Luxury housing'},
+  {id:'quantum_fig', title:'Quantum Fish Figurine', price:4200, tier:'Luxury', desc:'Strange properties'},
+  {id:'particle_accel', title:'Particle Gubby Accelerator', price:15000, tier:'Endgame', desc:'Speeds up everything'},
+  {id:'wormhole_portal', title:'Wormhole Snack Portal', price:22000, tier:'Endgame', desc:'Spawns rare snacks'},
+  {id:'blackhole_tank', title:'Black Hole Fish Tank', price:20000, tier:'Endgame', desc:'Attracts cosmic pets'},
+  {id:'quantum_accel', title:'Quantum Accelerator', price:30000, tier:'Endgame', desc:'Breaks time for clicks'},
+  {id:'immortal_treat', title:'Immortal Treat', price:99999, tier:'Endgame', desc:'Gubby never gets hungry'},
+  {id:'snackbox', title:'Snack Box', price:180, tier:'Basic', desc:'Mixed snacks'},
+  {id:'soda_pack', title:'Cola Pack', price:350, tier:'Basic', desc:'+2 Cola'},
+  {id:'toy2', title:'Squeaky Toy', price:120, tier:'Basic', desc:'Play toy'},
+  {id:'auto_feeder2', title:'Auto-Feeder Mk II', price:2400, tier:'Upgrades', desc:'+5 auto clicks'},
+  {id:'lux_cushion', title:'Luxury Cushion', price:900, tier:'Quality', desc:'Comfort'},
+  {id:'gold_chalice', title:'Gold Chalice', price:5000, tier:'Luxury', desc:'Fancy drinking'},
+  {id:'neon_sign', title:'Neon Gubby Sign', price:700, tier:'Quality', desc:'Stylish'},
+  {id:'orb', title:'Mystic Orb', price:4200, tier:'Endgame', desc:'Weird energies'},
+  {id:'pillow', title:'Pillow', price:75, tier:'Basic', desc:'Small comfort'},
+  {id:'blanket', title:'Blanket', price:120, tier:'Basic', desc:'Cozy'},
+  {id:'treats', title:'Treats (10)', price:300, tier:'Upgrades', desc:'Bulk snacks'},
+  {id:'fancy_plate', title:'Fancy Plate', price:1100, tier:'Quality', desc:'Fine dining'},
+  {id:'mystic_hat', title:'Mystic Hat', price:1300, tier:'Quality', desc:'Looks mysterious'},
+  {id:'rocket_bed', title:'Rocket Bed', price:7600, tier:'Luxury', desc:'Bed with propulsion'},
+  {id:'galaxy_pendant', title:'Galaxy Pendant', price:42000, tier:'Endgame', desc:'Very endgame'},
+  {id:'time_clock', title:'Time Clock', price:12000, tier:'Endgame', desc:'Time-warping clock'},
+  {id:'mini_farm', title:'Mini Farm', price:2200, tier:'Quality', desc:'Generates food slowly'},
+  {id:'scented_candle', title:'Scented Candle', price:90, tier:'Basic', desc:'Pleasant aroma'},
+  {id:'plushie', title:'Plushie', price:200, tier:'Basic', desc:'Cute friend'},
+  {id:'laser_toy', title:'Laser Toy', price:480, tier:'Upgrades', desc:'Fun and energizing'},
+  {id:'zen_garden', title:'Zen Garden', price:1400, tier:'Quality', desc:'Relaxation'},
+  {id:'mystic_clock', title:'Mystic Clock', price:2400, tier:'Quality', desc:'Tick tocks nicely'},
+  {id:'quantum_seed', title:'Quantum Seed', price:5200, tier:'Endgame', desc:'Grows unpredictable snacks'}
+];
+const tiers = Array.from(new Set(shopData.map(s=>s.tier)));
+let currentTier = tiers[0];
 
 /* audio */
 let audioCtx=null, merpBuf=null;
 async function loadMerp(){ try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const r = await fetch(SOUND_BASE_PATH+'merp.mp3'); if(!r.ok){ merpBuf=null; return; } const ab = await r.arrayBuffer(); merpBuf = await audioCtx.decodeAudioData(ab); }catch(e){ merpBuf=null; } }
 loadMerp();
-function playMerp(){ if(merpBuf && audioCtx){ const s=audioCtx.createBufferSource(); s.buffer=merpBuf; s.playbackRate.value = 1 + (Math.random()*0.3 - .15); s.connect(audioCtx.destination); try{s.start(0)}catch(e){} }else try{ new Audio(SOUND_BASE_PATH+'merp.mp3').play().catch(()=>{}); } }
+function playMerp(){ if(merpBuf && audioCtx){ const s=audioCtx.createBufferSource(); s.buffer=merpBuf; s.playbackRate.value = 1 + (Math.random()*0.3 - .15); s.connect(audioCtx.destination); try{s.start(0)}catch(e){} }else try{ new Audio(SOUND_BASE_PATH+'merp.mp3').play().catch(()=>{}); }catch(e){} }
 
 /* ============== UTIL ============== */
 function el(id){ return document.getElementById(id); }
@@ -327,143 +409,274 @@ function applyUI(){
   hungerFill.style.width = clamp(state.hunger) + '%';
   thirstFill.style.width = clamp(state.thirst) + '%';
   energyFill.style.width = clamp(state.energy) + '%';
-  bpFood.textContent = state.backpack.food; bpWater.textContent = state.backpack.water; bpCola.textContent = state.backpack.cola;
-  clickCount.textContent = state.totalClicks;
+  el('accountInfo').textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
+  userInfo.textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
+  el('clickCount') && (el('clickCount').textContent = state.totalClicks);
   gubbySprite.src = SPRITE_BASE_PATH + state.variant;
   if(state.pos && typeof state.pos.x === 'number') gubbySprite.style.left = state.pos.x + 'px';
   if(state.pos && typeof state.pos.y === 'number') gubbySprite.style.top = state.pos.y + 'px';
-  el('accountInfo').textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
-  userInfo.textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
 }
 applyUI();
 
-/* ============== SHOP ITEMS (50+) ============== */
-/* You can edit/add items here; id must be unique */
-shopData = [
-  /* Basic Care (1-10) */
-  {id:'burger', title:'Burger', price:25, tier:'Basic', desc:'Food +10 Hunger', kind:'consumable', apply:(st)=>{ st.backpack.food+=1; }},
-  {id:'waterbottle', title:'Water Bottle', price:20, tier:'Basic', desc:'Water +10', kind:'consumable', apply:(st)=>{ st.backpack.water+=1; }},
-  {id:'ball', title:'Bouncy Ball', price:50, tier:'Basic', desc:'Play +5 Energy', apply:(st)=>{}},
-  {id:'smallbowl', title:'Small Bowl', price:80, tier:'Basic', desc:'Reduces hunger decay slightly', apply:(st)=>{ st.upgrades.hungerDecayMod = (st.upgrades.hungerDecayMod || 1) * 0.98; }},
-  {id:'waterfilter', title:'Water Filter', price:95, tier:'Basic', desc:'Reduces thirst decay', apply:(st)=>{ st.upgrades.thirstDecayMod = (st.upgrades.thirstDecayMod || 1) * 0.98; }},
-  {id:'toy1', title:'Rubber Duck', price:60, tier:'Basic', desc:'Play item', apply:(st)=>{}},
+/* ============== Firebase init & auth ============== */
+function initFirebase(){
+  if(window.firebase && !db){
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    auth.onAuthStateChanged(async u => {
+      user = u;
+      if(user){
+        signInBtn.style.display = 'none';
+        userInfo.textContent = user.displayName || user.email || 'You';
+        try{
+          const userRef = db.collection('users').doc(user.uid);
+          const userDoc = await userRef.get();
+          if(!userDoc.exists) await userRef.set({ displayName:user.displayName||user.email||'guest', email:user.email||null, privileges:'normal', createdAt:Date.now() });
+          const profile = (await userRef.get()).data();
+          if(profile?.privileges === 'admin') el('adminPanel').style.display = 'block';
+          else el('adminPanel').style.display = 'none';
+        }catch(e){ console.warn('user doc check failed', e); }
+      } else {
+        signInBtn.style.display = 'inline-block';
+        userInfo.textContent = 'Not signed in';
+        el('adminPanel').style.display = 'none';
+      }
+      applyUI();
+    });
 
-  /* Upgrades (11-25) */
-  {id:'clicker1', title:'Click Power +1', price:200, tier:'Upgrades', desc:'Increase click power', apply:(st)=>{ st.upgrades.clickPower = (st.upgrades.clickPower||1)+1; }},
-  {id:'autoclick1', title:'Auto-Clicker Mk I', price:600, tier:'Upgrades', desc:'+1 Auto click/sec', apply:(st)=>{ st.upgrades.autoClicks = (st.upgrades.autoClicks||0)+1; }},
-  {id:'bowl2', title:'Silver Bowl', price:400, tier:'Upgrades', desc:'Better food efficiency', apply:(st)=>{ st.upgrades.hungerDecayMod = (st.upgrades.hungerDecayMod||1)*0.95; }},
-  {id:'bed', title:'Cozy Bed', price:350, tier:'Upgrades', desc:'Energy recovers faster', apply:(st)=>{ st.upgrades.energyGain = (st.upgrades.energyGain||0)+1; }},
-  {id:'microphone', title:'DJ Microphone', price:480, tier:'Upgrades', desc:'Gubby likes music — +1 multiplier chance', apply:(st)=>{ st.upgrades.multipliers.push(1.02); }},
+    // variants + other collections
+    db.collection('variants').onSnapshot(snap => {
+      const arr = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      renderVariants(arr);
+    });
 
-  /* Quality (26-40) */
-  {id:'house_small', title:'Mini Gubby House', price:900, tier:'Quality', desc:'Nice home for Gubby', apply:(st)=>{}},
-  {id:'garden', title:'Garden', price:750, tier:'Quality', desc:'Auto grow snacks', apply:(st)=>{ st.upgrades.autoFood = (st.upgrades.autoFood||0)+1; }},
-  {id:'fountain', title:'Fountain', price:650, tier:'Quality', desc:'Relaxing water feature', apply:(st)=>{}},
-  {id:'trainer', title:'Personal Trainer', price:1200, tier:'Quality', desc:'+2 energy during day', apply:(st)=>{}},
+  }
+}
+initFirebase();
 
-  /* Luxury (41-56) */
-  {id:'gold_spoon', title:'Golden Feeding Spoon', price:2500, tier:'Luxury', desc:'Stylish and effective', apply:(st)=>{}},
-  {id:'meteor_bed', title:'Meteor Rock Bed', price:3200, tier:'Luxury', desc:'Very comfy', apply:(st)=>{}},
-  {id:'mansion', title:'Gubby Mansion', price:8000, tier:'Luxury', desc:'Luxury housing', apply:(st)=>{}},
-  {id:'quantum_fig', title:'Quantum Fish Figurine', price:4200, tier:'Luxury', desc:'Strange properties', apply:(st)=>{}},
+el('signInBtn').addEventListener('click', async ()=>{
+  try{
+    if(!db) initFirebase();
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await firebase.auth().signInWithPopup(provider);
+  }catch(e){ alert('Sign-in failed: ' + (e.message||e)); }
+});
 
-  /* Endgame / Silly (57-80) */
-  {id:'particle_accel', title:'Particle Gubby Accelerator', price:15000, tier:'Endgame', desc:'Speeds up everything (very silly)', apply:(st)=>{ st.upgrades.clickPower = (st.upgrades.clickPower||1)*1.5; }},
-  {id:'wormhole_portal', title:'Wormhole Snack Portal', price:22000, tier:'Endgame', desc:'Spawns rare snacks', apply:(st)=>{ st.upgrades.wormhole = true; }},
-  {id:'blackhole_tank', title:'Black Hole Fish Tank', price:20000, tier:'Endgame', desc:'Attracts cosmic pets', apply:(st)=>{}},
-  {id:'quantum_accel', title:'Quantum Accelerator', price:30000, tier:'Endgame', desc:'Breaks time for clicks', apply:(st)=>{ st.upgrades.clickPower = (st.upgrades.clickPower||1)*2; }},
-  {id:'immortal_treat', title:'Immortal Treat', price:99999, tier:'Endgame', desc:'Gubby never gets hungry!', apply:(st)=>{ st.hunger = 100; st.thirst=100; st.energy=100; st.upgrades.invincible=true; }},
+async function requireSignIn(){ if(!auth) initFirebase(); if(!auth.currentUser){ alert('Please sign in to use multiplayer.'); return false; } return true; }
 
-  /* filler items (add more to hit 50+) */
-  {id:'snackbox', title:'Snack Box', price:180, tier:'Basic', desc:'Mixed snacks', apply:(st)=>{ st.backpack.food+=2; }},
-  {id:'soda_pack', title:'Cola Pack', price:350, tier:'Basic', desc:'+2 Cola', apply:(st)=>{ st.backpack.cola+=2; }},
-  {id:'toy2', title:'Squeaky Toy', price:120, tier:'Basic', desc:'Play toy', apply:(st)=>{}},
-  {id:'auto_feeder2', title:'Auto-Feeder Mk II', price:2400, tier:'Upgrades', desc:'+5 auto click', apply:(st)=>{ st.upgrades.autoClicks = (st.upgrades.autoClicks||0)+5; }},
-  {id:'lux_cushion', title:'Luxury Cushion', price:900, tier:'Quality', desc:'Comfort', apply:(st)=>{}},
-  {id:'gold_chalice', title:'Gold Chalice', price:5000, tier:'Luxury', desc:'Fancy drinking', apply:(st)=>{}},
-  {id:'neon_sign', title:'Neon Gubby Sign', price:700, tier:'Quality', desc:'Stylish', apply:(st)=>{}},
-  {id:'orb', title:'Mystic Orb', price:4200, tier:'Endgame', desc:'Weird energies', apply:(st)=>{}},
+/* ============== ROOM: host/join/leave/listen ============== */
+function genCode(){
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let s=''; for(let i=0;i<4;i++) s+=letters[Math.floor(Math.random()*letters.length)];
+  return s;
+}
 
-  /* more filler to reach 50+ */
-  {id:'pillow', title:'Pillow', price:75, tier:'Basic', desc:'Small comfort', apply:(st)=>{}},
-  {id:'blanket', title:'Blanket', price:120, tier:'Basic', desc:'Cozy', apply:(st)=>{}},
-  {id:'treats', title:'Treats (10)', price:300, tier:'Upgrades', desc:'Bulk snacks', apply:(st)=>{ st.backpack.food+=10; }},
-  {id:'fancy_plate', title:'Fancy Plate', price:1100, tier:'Quality', desc:'Fine dining', apply:(st)=>{}},
-  {id:'mystic_hat', title:'Mystic Hat', price:1300, tier:'Quality', desc:'Looks mysterious', apply:(st)=>{}},
-  {id:'rocket_bed', title:'Rocket Bed', price:7600, tier:'Luxury', desc:'Bed with propulsion', apply:(st)=>{}},
-  {id:'galaxy_pendant', title:'Galaxy Pendant', price:42000, tier:'Endgame', desc:'Very endgame', apply:(st)=>{}},
-  {id:'time_clock', title:'Time Clock', price:12000, tier:'Endgame', desc:'Time-warping clock', apply:(st)=>{}},
-  {id:'mini_farm', title:'Mini Farm', price:2200, tier:'Quality', desc:'Generates food slowly', apply:(st)=>{ st.upgrades.autoFood=(st.upgrades.autoFood||0)+1 }},
-  {id:'scented_candle', title:'Scented Candle', price:90, tier:'Basic', desc:'Pleasant aroma', apply:(st)=>{}},
-  {id:'plushie', title:'Plushie', price:200, tier:'Basic', desc:'Cute friend', apply:(st)=>{}},
-  {id:'laser_toy', title:'Laser Toy', price:480, tier:'Upgrades', desc:'Fun and energizing', apply:(st)=>{}},
-  {id:'zen_garden', title:'Zen Garden', price:1400, tier:'Quality', desc:'Relaxation', apply:(st)=>{}}
-];
-/* ensure at least 50 items (fill duplicates if needed) */
-while(shopData.length < 54) shopData.push({...shopData[shopData.length%shopData.length], id: 'filler_' + shopData.length});
+async function hostRoom(){
+  if(!await requireSignIn()) return;
+  if(currentRoom) return alert('Leave existing room first.');
+  for(let attempt=0; attempt<6; attempt++){
+    const code = genCode();
+    try{
+      const ref = db.collection('rooms').doc(code);
+      const snap = await ref.get();
+      if(!snap.exists){
+        isHost = true; currentRoom = code;
+        const payload = { state: state, shopOwned: [], resetVotes: [], hostUid: auth.currentUser.uid, from: myPeerId, seq: ++localSeq, createdAt: Date.now() };
+        await ref.set(payload);
+        // add member doc
+        await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, displayName: auth.currentUser.displayName||auth.currentUser.email||'You', joinedAt: Date.now() });
+        listenRoom(code);
+        listenMembers(code);
+        updateRoomUI(true, code);
+        alert('Room created: ' + code);
+        return;
+      }
+    }catch(e){ console.warn('host attempt failed', e); }
+  }
+  alert('Failed to create room, try again.');
+}
 
-/* group tiers */
-const tiers = Array.from(new Set(shopData.map(s=>s.tier)));
-/* ============== UI: Shop rendering & logic (synchronized) ============== */
+async function joinRoom(code){
+  if(!await requireSignIn()) return;
+  if(currentRoom) return alert('Already in a room.');
+  code = (code||'').trim().toUpperCase();
+  if(!code) return alert('Enter room code');
+  try{
+    const ref = db.collection('rooms').doc(code);
+    const snap = await ref.get();
+    if(!snap.exists) return alert('Room not found: ' + code);
+    currentRoom = code; isHost = false;
+    await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, displayName: auth.currentUser.displayName||auth.currentUser.email||'You', joinedAt: Date.now() });
+    listenRoom(code);
+    listenMembers(code);
+    updateRoomUI(true, code);
+    alert('Joined ' + code);
+  }catch(e){ alert('Join failed: ' + (e.message||e)); }
+}
+
+async function leaveRoom(userRequested=true){
+  if(!currentRoom) return;
+  try{
+    const code = currentRoom;
+    const ref = db.collection('rooms').doc(code);
+    if(auth && auth.currentUser){
+      await ref.collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
+    }
+    if(isHost){
+      const mSnap = await ref.collection('members').limit(1).get();
+      if(mSnap.empty) await ref.delete().catch(()=>{});
+    }
+  }catch(e){ console.warn('leave error', e); }
+  if(roomUnsub){ roomUnsub(); roomUnsub = null; }
+  if(membersUnsub){ membersUnsub(); membersUnsub = null; }
+  if(messagesUnsub){ messagesUnsub(); messagesUnsub = null; }
+  currentRoom = null; isHost = false;
+  document.body.classList.remove('room-mode');
+  modeText.textContent = 'Solo play';
+  roomCodeDisplay.textContent = '';
+  copyRoomBtn.classList.add('hidden'); leaveRoomBtn.classList.add('hidden'); chatBtn.classList.add('hidden');
+  connectionStatus.textContent = 'Not connected';
+  membersEl.innerHTML = '';
+}
+
+function listenRoom(code){
+  if(roomUnsub) roomUnsub();
+  const ref = db.collection('rooms').doc(code);
+  roomUnsub = ref.onSnapshot(snap => {
+    if(!snap.exists){ alert('Room closed'); leaveRoom(false); return; }
+    const data = snap.data();
+    if(!data) return;
+    // ignore echo from ourselves
+    const seq = Number(data.seq || 0), from = data.from;
+    if(from !== myPeerId){
+      if(data.state) mergeRemoteState(data.state);
+    }
+    // store cached room snapshot for shop UI
+    window.__roomCache = data;
+    renderShopGrid(currentTier);
+    updateResetStatus(data.resetVotes || []);
+  }, err => console.warn('room listen err', err));
+}
+
+function listenMembers(code){
+  if(membersUnsub) membersUnsub();
+  const mRef = db.collection('rooms').doc(code).collection('members');
+  membersUnsub = mRef.onSnapshot(snap => {
+    const arr = [];
+    snap.forEach(d => arr.push(d.data()));
+    renderMembers(arr);
+  }, err => console.warn('members listen err', err));
+}
+
+/* ============== MEMBERS UI ============== */
+function renderMembers(list){
+  membersEl.innerHTML = '';
+  list.forEach(m => {
+    const div = document.createElement('div'); div.className='member';
+    div.innerHTML = `<div style="width:40px;height:40px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-weight:800">${(m.displayName||m.uid||'U')[0].toUpperCase()}</div>
+      <div style="display:flex;flex-direction:column"><div style="font-weight:800">${m.displayName||m.uid}</div><div class="subtitle">joined</div></div>`;
+    membersEl.appendChild(div);
+  });
+}
+
+/* update UI on join/leave */
+function updateRoomUI(connected, code){
+  if(connected){
+    document.body.classList.add('room-mode');
+    modeText.textContent = 'In room';
+    connectionStatus.textContent = 'Connected';
+    roomCodeDisplay.textContent = code||'';
+    copyRoomBtn.classList.remove('hidden'); leaveRoomBtn.classList.remove('hidden'); chatBtn.classList.remove('hidden'); el('copyInviteBtn').classList.remove('hidden');
+  } else {
+    document.body.classList.remove('room-mode');
+    modeText.textContent = 'Solo play';
+    connectionStatus.textContent = 'Not connected';
+    roomCodeDisplay.textContent = ''; copyRoomBtn.classList.add('hidden'); leaveRoomBtn.classList.add('hidden'); chatBtn.classList.add('hidden'); el('copyInviteBtn').classList.add('hidden');
+  }
+}
+
+/* schedule/debounce writes */
+function scheduleWrite(){
+  saveState(); applyUI();
+  if(!currentRoom) return;
+  if(writeTimer) clearTimeout(writeTimer);
+  writeTimer = setTimeout(()=> writeRoomNow(), WRITE_DEBOUNCE_MS);
+}
+function writeRoomNow(){
+  if(!currentRoom) return;
+  const ref = db.collection('rooms').doc(currentRoom);
+  const payload = { state: state, from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() };
+  ref.set(payload, { merge: true }).catch(e=>console.warn('write failed', e));
+}
+
+/* merge remote state conservatively */
+function mergeRemoteState(remote){
+  if(!remote) return;
+  if(remote.totalClicks > state.totalClicks){
+    state.totalClicks = remote.totalClicks;
+    state.upgrades = remote.upgrades || state.upgrades;
+    state.variant = remote.variant || state.variant;
+  }
+  state.backpack.food = Math.max(state.backpack.food, remote.backpack?.food || 0);
+  state.backpack.water = Math.max(state.backpack.water, remote.backpack?.water || 0);
+  state.backpack.cola = Math.max(state.backpack.cola, remote.backpack?.cola || 0);
+  state.hunger = Math.round((state.hunger + (remote.hunger||state.hunger))/2);
+  state.thirst = Math.round((state.thirst + (remote.thirst||state.thirst))/2);
+  state.energy = Math.round((state.energy + (remote.energy||state.energy))/2);
+  saveState(); applyUI();
+}
+
+/* ============== SHOP UI & sync ============== */
 function openShop(){
-  el('shopModal').style.display='flex';
-  setTimeout(()=> el('shopBox').classList.add('show'), 10);
-  renderTierButtons();
-  renderShopGrid(currentTier);
+  el('shopModal').style.display='flex'; setTimeout(()=> el('shopBox').classList.add('show'), 10);
+  renderTierButtons(); renderShopGrid(currentTier);
 }
-function closeShop(){
-  el('shopBox').classList.remove('show');
-  setTimeout(()=> el('shopModal').style.display='none', 180);
-}
-el('shopBtn').addEventListener('click', ()=> openShop());
+function closeShop(){ el('shopBox').classList.remove('show'); setTimeout(()=> el('shopModal').style.display='none', 180); }
+el('shopBtn').addEventListener('click', openShop);
 el('shopClose').addEventListener('click', closeShop);
 
-/* tier buttons */
 function renderTierButtons(){
-  const container = el('tierButtons'); container.innerHTML='';
+  tierButtons.innerHTML = '';
   tiers.forEach(t=>{
-    const b = document.createElement('button');
-    b.className = 'btn small secondary';
-    b.textContent = t;
+    const b = document.createElement('button'); b.className='btn small secondary'; b.textContent = t;
     if(t === currentTier){ b.classList.add('btn'); b.classList.remove('secondary'); }
     b.addEventListener('click', ()=>{ currentTier = t; renderTierButtons(); renderShopGrid(t); });
-    container.appendChild(b);
+    tierButtons.appendChild(b);
   });
 }
 
-/* shop grid renders items; if in-room, check room doc's shopOwned */
 function renderShopGrid(tier){
-  const grid = el('shopGrid'); grid.innerHTML='';
+  shopGrid.innerHTML = '';
   const list = shopData.filter(s => s.tier === tier);
-  // get owned list from room doc if present
-  const roomDocOwned = window._roomCached?.shopOwned || [];
-  list.forEach(it=>{
+  const owned = (window.__roomCache && window.__roomCache.shopOwned) || [];
+  list.forEach(it => {
     const card = document.createElement('div'); card.className='shop-card';
-    card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <div class="title">${it.title}</div>
-        <div class="small-muted">${it.desc}</div>
+    const ownedFlag = owned.includes(it.id);
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="title">${it.title}</div>
+          <div class="subtitle">${it.desc}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="price">${it.price} ✨</div>
+        </div>
       </div>
-      <div style="text-align:right">
-        <div class="price">${it.price} ✨</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
-      <div style="font-size:12px;color:var(--muted)">${it.id}</div>
-      <div>
-        <button class="btn small ${roomDocOwned.includes(it.id)?'ghost secondary':''}" ${roomDocOwned.includes(it.id)?'disabled':''}>${roomDocOwned.includes(it.id)?'Owned':'Buy'}</button>
-      </div>
-    </div>`;
+      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+        <div class="subtitle">${it.id}</div>
+        <div><button class="btn small ${ownedFlag ? 'ghost secondary' : ''}" ${ownedFlag ? 'disabled' : ''}>${ownedFlag ? 'Owned' : 'Buy'}</button></div>
+      </div>`;
     const btn = card.querySelector('button');
     btn.addEventListener('click', ()=> buyItem(it));
-    grid.appendChild(card);
+    shopGrid.appendChild(card);
   });
 }
 
-/* buyItem: transactionally update room doc with purchase (syncs for all players) */
+/* buyItem via transaction that updates room.shopOwned and room.state.totalClicks */
 async function buyItem(item){
-  if(!currentRoom) return alert('Join a room to buy items (shop is synced in multiplayer).');
-  if(!user) return alert('You must be signed in to purchase.');
+  if(!currentRoom) return alert('Join a room to buy (shop syncs in multiplayer).');
+  if(!user) return alert('Sign in to buy.');
   const roomRef = db.collection('rooms').doc(currentRoom);
   try{
     await db.runTransaction(async tx => {
@@ -474,34 +687,160 @@ async function buyItem(item){
       if(owned.includes(item.id)) throw new Error('Already owned');
       const roomState = data.state || {};
       const totalClicks = Number(roomState.totalClicks || 0);
-      if(totalClicks < item.price) throw new Error('Not enough clicks in room balance');
-      // apply item to local state copy, then write back
+      if(totalClicks < item.price) throw new Error('Not enough room clicks balance');
       const newOwned = owned.concat([item.id]);
-      const newState = Object.assign({}, state); // shallow copy
-      // perform apply function (items have apply function defined locally, but Firestore can't run code)
-      // We'll apply locally then store state - but important: we need to ensure consensus
-      // Here we just deduct price and persist owned list & new state.
+      // apply item effects locally to our copy of state
+      const newState = Object.assign({}, state);
       newState.totalClicks = totalClicks - item.price;
-      // run the JS-side apply function to modify local state object
-      try{ item.apply(newState); }catch(e){ console.warn('item apply failed', e); }
-      tx.update(roomRef, { shopOwned: newOwned, state: newState, lastUpdated: Date.now(), from: myPeerId, seq: ++localSeq });
-      // also write to local state so UI updates quickly - full authoritative merge will come from snapshot
+      // simple item effects (some items are placeholders)
+      if(item.id === 'burger') newState.backpack = Object.assign({}, newState.backpack, { food: (newState.backpack.food||0)+1 });
+      if(item.id === 'waterbottle') newState.backpack = Object.assign({}, newState.backpack, { water: (newState.backpack.water||0)+1 });
+      if(item.id === 'clicker1') newState.upgrades = Object.assign({}, newState.upgrades, { clickPower: (newState.upgrades.clickPower||1)+1 });
+      if(item.id === 'autoclick1') newState.upgrades = Object.assign({}, newState.upgrades, { autoClicks: (newState.upgrades.autoClicks||0)+1 });
+      if(item.id === 'particle_accel') newState.upgrades = Object.assign({}, newState.upgrades, { clickPower: (newState.upgrades.clickPower||1)*1.5 });
+      // write back
+      tx.update(roomRef, { shopOwned: newOwned, state: newState, from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
+      // also update local state for immediate feedback
       state = newState;
     });
     applyUI();
-    // shop UI will update from snapshot - but refresh locally now
-    setTimeout(()=> renderShopGrid(currentTier), 200);
+    renderShopGrid(currentTier);
     alert('Purchased ' + item.title);
-  }catch(err){
-    alert('Purchase failed: ' + (err.message || err));
-  }
+  }catch(e){ alert('Purchase failed: ' + (e.message || e)); }
 }
 
-/* ============== Game actions & loops (same as earlier) ============== */
+/* ============== CHAT (messages subcollection) ============== */
+function openChat(){
+  if(!currentRoom) return alert('Join a room to chat.');
+  chatModal.style.display = 'flex';
+  setTimeout(()=> chatBox.classList.add('show'), 10);
+  chatRoomCode.textContent = currentRoom ? `Room ${currentRoom}` : '';
+  listenMessages(currentRoom);
+}
+function closeChat(){
+  if(messagesUnsub){ messagesUnsub(); messagesUnsub = null; }
+  chatBox.classList.remove('show'); setTimeout(()=> chatModal.style.display = 'none', 180);
+}
+chatClose.addEventListener('click', closeChat);
+chatBtn.addEventListener('click', openChat);
+
+function listenMessages(code){
+  if(messagesUnsub) messagesUnsub();
+  const msgsRef = db.collection('rooms').doc(code).collection('messages').orderBy('createdAt','asc').limit(200);
+  messagesUnsub = msgsRef.onSnapshot(snap => {
+    chatMessages.innerHTML = '';
+    snap.forEach(doc => {
+      const m = doc.data();
+      const elMsg = document.createElement('div');
+      elMsg.style.marginBottom = '8px';
+      elMsg.innerHTML = `<div style="font-weight:700">${escapeHtml(m.name || m.uid)}</div><div class="subtitle">${escapeHtml(m.text)}</div><div style="font-size:11px;color:var(--muted)">${new Date(m.createdAt).toLocaleTimeString()}</div>`;
+      chatMessages.appendChild(elMsg);
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }, err => console.warn('messages listen err', err));
+}
+
+chatSend.addEventListener('click', sendChatMessage);
+chatInput.addEventListener('keydown', (e)=> { if(e.key === 'Enter') sendChatMessage(); });
+
+async function sendChatMessage(){
+  if(!currentRoom) return alert('Join a room first.');
+  if(!user) return alert('Sign in to chat.');
+  const text = (chatInput.value || '').trim();
+  if(!text) return;
+  const msgsRef = db.collection('rooms').doc(currentRoom).collection('messages');
+  try{
+    await msgsRef.add({ uid: auth.currentUser.uid, name: auth.currentUser.displayName || auth.currentUser.email || 'You', text, createdAt: Date.now() });
+    chatInput.value = '';
+  }catch(e){ console.warn('send chat failed', e); alert('Failed to send message'); }
+}
+
+chatClear.addEventListener('click', async ()=>{
+  if(!confirm('Clear chat for everyone in this room?')) return;
+  if(!currentRoom) return;
+  try{
+    // only allow if authenticated
+    if(!auth.currentUser) return alert('Sign in required');
+    // delete messages in batches
+    const msgsRef = db.collection('rooms').doc(currentRoom).collection('messages');
+    const snap = await msgsRef.get();
+    const batch = db.batch();
+    snap.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    alert('Chat cleared');
+  }catch(e){ console.warn('clear chat failed', e); alert('Clear chat failed'); }
+});
+
+/* ============== RESET: unanimous votes and clearing chat ============== */
+el('resetBtn').addEventListener('click', ()=> {
+  if(!currentRoom) return alert('Join a room to request reset');
+  el('resetModal').style.display = 'flex'; setTimeout(()=> el('resetBox').classList.add('show'), 10);
+});
+el('resetCancel').addEventListener('click', ()=> { el('resetBox').classList.remove('show'); setTimeout(()=> el('resetModal').style.display='none',180); });
+
+el('resetAgree').addEventListener('click', async ()=>{
+  if(!currentRoom) return;
+  const roomRef = db.collection('rooms').doc(currentRoom);
+  try{
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(roomRef);
+      if(!snap.exists) throw new Error('Room missing');
+      const data = snap.data();
+      const resetVotes = new Set(data.resetVotes || []);
+      resetVotes.add(auth.currentUser.uid);
+      // read member docs
+      const membersSnap = await roomRef.collection('members').get();
+      const memberIds = [];
+      membersSnap.forEach(m => memberIds.push(m.id));
+      if(memberIds.length === 0) {
+        // if no members, just reset immediately
+        tx.update(roomRef, { state: defaultState, resetVotes: [], shopOwned: [], from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
+      } else if(memberIds.every(id => resetVotes.has(id))){
+        // everyone agreed -> reset state & clear votes & shopOwned
+        tx.update(roomRef, { state: defaultState, resetVotes: [], shopOwned: [], from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
+      } else {
+        // record vote
+        tx.update(roomRef, { resetVotes: Array.from(resetVotes), from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
+      }
+    });
+    // after transaction, if reset occurred we should also clear messages subcollection (non-transaction)
+    // check if resetVotes was cleared by reading doc
+    const doc = await roomRef.get();
+    const dataAfter = doc.data();
+    if(dataAfter && Array.isArray(dataAfter.resetVotes) && dataAfter.resetVotes.length === 0){
+      // clear messages
+      try{
+        const msgsRef = roomRef.collection('messages');
+        const snap = await msgsRef.get();
+        const batchArray = [];
+        if(!snap.empty){
+          let batch = db.batch(), ops = 0;
+          snap.forEach(d => { batch.delete(d.ref); ops++; if(ops === 500){ batchArray.push(batch); batch = db.batch(); ops = 0; } });
+          batchArray.push(batch);
+          for(const b of batchArray) await b.commit();
+        }
+      }catch(e){ console.warn('post-reset message deletion failed', e); }
+    }
+    el('resetBox').classList.remove('show'); setTimeout(()=> el('resetModal').style.display='none',180);
+    alert('Your vote was recorded. Reset happens when all members agree. Chat will be cleared if reset occurs.');
+  }catch(e){ console.warn('reset tx failed', e); alert('Reset failed: ' + (e.message||e)); }
+});
+
+/* update reset status UI (x of y agreed) */
+async function updateResetStatus(votes){
+  if(!currentRoom){ el('resetStatus').textContent = ''; return; }
+  try{
+    const membersSnap = await db.collection('rooms').doc(currentRoom).collection('members').get();
+    const memberCount = membersSnap.size;
+    el('resetStatus').textContent = `${(votes||[]).length} / ${memberCount} agreed`;
+  }catch(e){ el('resetStatus').textContent = `${(votes||[]).length} votes`; }
+}
+
+/* ============== Game actions, loops ============== */
 function clickGubby(){
   if(!state.alive) return;
   if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
-  const mult = state.upgrades.multipliers?.reduce((a,b)=>a*b,1) || 1;
+  const mult = (state.upgrades.multipliers || []).reduce((a,b)=>a*b,1) || 1;
   const power = (state.upgrades.clickPower || 1) * mult;
   state.clicks += power; state.totalClicks += power;
   state.hunger = Math.max(0, state.hunger - 0.1);
@@ -525,7 +864,7 @@ el('waterBtn').addEventListener('click', ()=> useBackpack('water'));
 el('colaBtn').addEventListener('click', ()=> useBackpack('cola'));
 el('playBtn').addEventListener('click', ()=> { state.energy = Math.min(100, state.energy + 8); scheduleWrite(); });
 
-/* wander + decay */
+/* wander + decay loops */
 function wander(){
   if(!state.alive) return;
   const margin = 80;
@@ -546,11 +885,11 @@ setInterval(()=>{
   if(!state.alive) return;
   state.hunger = Math.max(0, state.hunger - (state.upgrades?.hungerDecayMod || 1));
   state.thirst = Math.max(0, state.thirst - (state.upgrades?.thirstDecayMod || 1.2));
-  const h = (new Date()).getHours();
-  if(h>=22||h<7) state.energy = Math.min(100, state.energy + (state.upgrades?.energyGain||2)); else state.energy = Math.max(0, state.energy - 0.5);
-  if(state.hunger===0 || state.thirst===0) state.energy = Math.max(0, state.energy - 2);
+  const hour = (new Date()).getHours();
+  if(hour>=22||hour<7) state.energy = Math.min(100, state.energy + (state.upgrades?.energyGain||2)); else state.energy = Math.max(0, state.energy - 0.5);
+  if(state.hunger === 0 || state.thirst === 0) state.energy = Math.max(0, state.energy - 2);
   if(state.upgrades.autoClicks > 0) addClicks(state.upgrades.autoClicks);
-  if(state.energy <=0 || state.hunger <=0 || state.thirst <=0){
+  if(state.energy <= 0 || state.hunger <= 0 || state.thirst <= 0){
     state.alive = false;
     scheduleWrite();
     showGameOver();
@@ -560,293 +899,43 @@ setInterval(()=>{
 
 function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyUI(); }
 
-/* Game over UI */
+/* game over UI */
 function showGameOver(){ el('gameOverBackdrop').style.display='flex'; setTimeout(()=> el('gameOverBox').classList.add('show'), 10); }
 function hideGameOver(){ el('gameOverBox').classList.remove('show'); setTimeout(()=> el('gameOverBackdrop').style.display='none', 200); }
 el('restartBtn').addEventListener('click', ()=> {
-  // unanimous restart handled separately; here local restart triggers scheduleWrite
   state = JSON.parse(JSON.stringify(defaultState));
   scheduleWrite();
   saveState(); applyUI(); hideGameOver();
 });
 
-/* ============== Firebase init & auth ============== */
-function initFirebase(){
-  if(window.firebase && !db){
-    firebase.initializeApp(firebaseConfig);
-    auth = firebase.auth();
-    db = firebase.firestore();
-
-    auth.onAuthStateChanged(async u=>{
-      user = u;
-      if(user){
-        signInBtn.style.display='none';
-        userInfo.textContent = user.displayName || user.email || 'You';
-        // ensure user doc exists & admin check
-        try{
-          const userRef = db.collection('users').doc(user.uid);
-          const doc = await userRef.get();
-          if(!doc.exists) await userRef.set({ displayName:user.displayName||user.email||'guest', email:user.email||null, privileges:'normal', createdAt:Date.now() });
-          const profile = (await userRef.get()).data();
-          if(profile?.privileges === 'admin') el('adminPanel').style.display = 'block';
-          else el('adminPanel').style.display = 'none';
-        }catch(e){ console.warn('user doc check error', e); }
-      } else {
-        signInBtn.style.display='inline-block';
-        userInfo.textContent = 'Not signed in';
-        el('adminPanel').style.display = 'none';
-      }
-      applyUI();
-    });
-
-    // variants live
-    db.collection('variants').onSnapshot(snap => {
-      const items = snap.docs.map(d=>({id:d.id,...d.data()}));
-      renderVariants(items);
-    });
-
-    // optionally keep a cached room doc snapshot for UI use (shop owned etc)
-    window._roomCached = {};
-  }
-}
-initFirebase();
-el('signInBtn').addEventListener('click', async ()=>{
-  if(!db) initFirebase();
-  try{
-    const provider = new firebase.auth.GoogleAuthProvider();
-    await firebase.auth().signInWithPopup(provider);
-  }catch(e){ alert('Sign in failed: ' + e.message); }
-});
-async function requireSignIn(){ if(!auth) initFirebase(); if(!auth.currentUser){ alert('Please sign in to use multiplayer.'); return false } return true; }
-
-/* ============== Rooms: create/join/leave/listen ================= */
-
-/* generate 4-letter code */
-function genCode(){
-  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let s=''; for(let i=0;i<4;i++) s+=letters[Math.floor(Math.random()*letters.length)];
-  return s;
-}
-
-/* host a room */
-async function hostRoom(){
-  if(!await requireSignIn()) return;
-  if(currentRoom) return alert('Leave existing room first.');
-  for(let i=0;i<6;i++){
-    const code = genCode();
-    const ref = db.collection('rooms').doc(code);
-    const snap = await ref.get();
-    if(!snap.exists){
-      isHost = true; currentRoom = code;
-      const payload = { state: state, shopOwned: [], resetVotes: [], membersCount: 1, hostUid: auth.currentUser.uid, from: myPeerId, seq: ++localSeq, createdAt: Date.now() };
-      await ref.set(payload);
-      // add member doc
-      await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, displayName: auth.currentUser.displayName||auth.currentUser.email||'You', joinedAt: Date.now() });
-      // listen
-      listenRoom(code);
-      listenMembers(code);
-      updateRoomUI(true, code);
-      alert('Room created: ' + code);
-      return;
-    }
-  }
-  alert('Failed to create room, try again.');
-}
-
-/* join room */
-async function joinRoom(code){
-  if(!await requireSignIn()) return;
-  if(currentRoom) return alert('Already in a room.');
-  code = (code||'').trim().toUpperCase();
-  if(!code) return alert('Enter room code');
-  const ref = db.collection('rooms').doc(code);
-  const snap = await ref.get();
-  if(!snap.exists) return alert('Room not found: ' + code);
-  currentRoom = code; isHost = false;
-  // add member doc
-  await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, displayName: auth.currentUser.displayName||auth.currentUser.email||'You', joinedAt: Date.now() });
-  listenRoom(code);
-  listenMembers(code);
-  updateRoomUI(true, code);
-  alert('Joined ' + code);
-}
-
-/* leave */
-async function leaveRoom(userRequested=true){
-  if(!currentRoom) return;
-  try{
-    const code = currentRoom;
-    const ref = db.collection('rooms').doc(code);
-    if(auth && auth.currentUser){
-      await ref.collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
-    }
-    // if host, maybe delete if no members remain
-    if(isHost){
-      const mSnap = await ref.collection('members').limit(1).get();
-      if(mSnap.empty) await ref.delete().catch(()=>{});
-    }
-  }catch(e){ console.warn('leave error', e); }
-  if(roomUnsub){ roomUnsub(); roomUnsub = null; }
-  if(membersUnsub){ membersUnsub(); membersUnsub = null; }
-  currentRoom = null; isHost = false;
-  document.body.classList.remove('room-mode');
-  modeText.textContent = 'Solo play';
-  roomCodeDisplay.textContent = '';
-  copyRoomBtn.classList.add('hidden'); leaveRoomBtn.classList.add('hidden');
-  connectionStatus.textContent = 'Not connected';
-  membersEl.innerHTML = '';
-  if(userRequested) alert('Left room');
-}
-
-/* listen to room doc (state + shopOwned + resetVotes) */
-function listenRoom(code){
-  if(roomUnsub) roomUnsub();
-  const ref = db.collection('rooms').doc(code);
-  roomUnsub = ref.onSnapshot(snap=>{
-    if(!snap.exists){ alert('Room closed'); leaveRoom(false); return; }
-    const data = snap.data();
-    if(!data) return;
-    // cache for UI usage (shop owned)
-    window._roomCached = data;
-    // merge state (prevent echo loops by ignoring updates from ourselves using 'from')
-    const seq = Number(data.seq || 0), from = data.from;
-    if(from !== myPeerId){
-      // apply merge strategy similar to earlier
-      if(data.state) mergeRemoteState(data.state);
-    }
-    // update shop UI cached owned
-    renderShopGrid(currentTier);
-    // render resetVotes status
-    updateResetStatus(data.resetVotes || []);
-  }, err => { console.warn('room listen err', err); });
-}
-
-/* member list listener */
-function listenMembers(code){
-  if(membersUnsub) membersUnsub();
-  const mRef = db.collection('rooms').doc(code).collection('members');
-  membersUnsub = mRef.onSnapshot(snap=>{
-    const arr = [];
-    snap.forEach(d=> arr.push(d.data()));
-    renderMembers(arr);
-  }, err => console.warn('members listen err', err));
-}
-
-/* renderMembers to UI */
-function renderMembers(list){
-  membersEl.innerHTML = '';
-  list.forEach(m => {
-    const div = document.createElement('div'); div.className='member';
-    div.innerHTML = `<div style="width:40px;height:40px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-weight:800">${(m.displayName||m.uid||'U')[0].toUpperCase()}</div>
-      <div style="display:flex;flex-direction:column"><div style="font-weight:800">${m.displayName||m.uid}</div><div class="small-muted">joined</div></div>`;
-    membersEl.appendChild(div);
+/* ============== Variants admin ============== */
+function renderVariants(items){
+  const wrap = el('variantsList'); wrap.innerHTML = '';
+  items.forEach(v=>{
+    const d = document.createElement('div'); d.className = 'variant-item';
+    d.innerHTML = `<div><strong>${v.displayName||v.id}</strong><div class="subtitle">${v.fileName}</div></div><div><button class="btn small">Select</button></div>`;
+    d.querySelector('button').addEventListener('click', ()=> { state.variant = v.fileName; scheduleWrite(); applyUI(); });
+    wrap.appendChild(d);
   });
 }
-
-/* update UI on join/leave */
-function updateRoomUI(connected, code){
-  if(connected){
-    document.body.classList.add('room-mode');
-    modeText.textContent = 'In room';
-    connectionStatus.textContent = 'Connected';
-    roomCodeDisplay.textContent = code||'';
-    copyRoomBtn.classList.remove('hidden'); leaveRoomBtn.classList.remove('hidden');
-  } else {
-    document.body.classList.remove('room-mode');
-    modeText.textContent = 'Solo play';
-    connectionStatus.textContent = 'Not connected';
-    roomCodeDisplay.textContent = ''; copyRoomBtn.classList.add('hidden'); leaveRoomBtn.classList.add('hidden');
-  }
-}
-
-/* schedule/debounce writes of local state to room (non-transactional set merge) */
-function scheduleWrite(){
-  saveState(); applyUI();
-  if(!currentRoom) return;
-  if(writeTimer) clearTimeout(writeTimer);
-  writeTimer = setTimeout(()=> writeRoomNow(), WRITE_DEBOUNCE_MS);
-}
-function writeRoomNow(){
-  if(!currentRoom) return;
-  const ref = db.collection('rooms').doc(currentRoom);
-  const payload = { state: state, from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() };
-  ref.set(payload, { merge: true }).catch(e=>console.warn('write failed', e));
-}
-
-/* merge remote state: conservative merging */
-function mergeRemoteState(remote){
-  if(!remote) return;
-  if(remote.totalClicks > state.totalClicks){
-    state.totalClicks = remote.totalClicks;
-    state.upgrades = remote.upgrades || state.upgrades;
-    state.variant = remote.variant || state.variant;
-  }
-  state.backpack.food = Math.max(state.backpack.food, remote.backpack?.food || 0);
-  state.backpack.water = Math.max(state.backpack.water, remote.backpack?.water || 0);
-  state.backpack.cola = Math.max(state.backpack.cola, remote.backpack?.cola || 0);
-  state.hunger = Math.round((state.hunger + (remote.hunger||state.hunger))/2);
-  state.thirst = Math.round((state.thirst + (remote.thirst||state.thirst))/2);
-  state.energy = Math.round((state.energy + (remote.energy||state.energy))/2);
-  saveState(); applyUI();
-}
-
-/* ========== Reset Room (unanimous votes) ========== */
-/* open modal to agree */
-el('resetBtn').addEventListener('click', ()=>{
-  if(!currentRoom){ alert('You must be in a room to request reset'); return; }
-  el('resetModal').style.display='flex'; setTimeout(()=> el('resetBox').classList.add('show'), 10);
+el('variantFile').addEventListener('input', (e)=> {
+  const v = e.target.value.trim(); if(!v){ el('variantPreview').style.display='none'; return; }
+  el('variantPreview').src = SPRITE_BASE_PATH + v; el('variantPreview').style.display='block';
 });
-el('resetCancel').addEventListener('click', ()=> { el('resetBox').classList.remove('show'); setTimeout(()=> el('resetModal').style.display='none', 180); });
-
-el('resetAgree').addEventListener('click', async ()=>{
-  if(!currentRoom) return;
-  const roomRef = db.collection('rooms').doc(currentRoom);
+el('createVariant').addEventListener('click', async ()=> {
+  if(!db || !auth || !auth.currentUser) return alert('Sign-in required');
+  const id = el('variantId').value.trim(), display = el('variantDisplay').value.trim(), file = el('variantFile').value.trim(), price = Number(el('variantPrice').value||0);
+  let attrs = {};
+  try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid attrs JSON'); }
+  if(!id || !file) return alert('Provide id & file');
   try{
-    await db.runTransaction(async tx => {
-      const snap = await tx.get(roomRef);
-      if(!snap.exists) throw new Error('Room missing');
-      const data = snap.data();
-      const resetVotes = new Set(data.resetVotes || []);
-      resetVotes.add(auth.currentUser.uid);
-      // get member count
-      const membersSnap = await tx.get(roomRef.collection('members'));
-      const memberIds = [];
-      membersSnap.forEach(m=> memberIds.push(m.id));
-      // if everyone voted -> reset
-      if(memberIds.every(id => resetVotes.has(id))){
-        // set state to default & clear resetVotes + clear shopOwned
-        const newState = JSON.parse(JSON.stringify(defaultState));
-        tx.update(roomRef, { state: newState, resetVotes: [], shopOwned: [], from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
-      } else {
-        // just record the vote
-        tx.update(roomRef, { resetVotes: Array.from(resetVotes), from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
-      }
-    });
-    el('resetBox').classList.remove('show'); setTimeout(()=> el('resetModal').style.display='none', 180);
-    alert('Your vote has been recorded. Reset will happen when all members agree.');
-  }catch(e){ alert('Reset failed: ' + (e.message||e)); console.warn(e); }
+    await db.collection('variants').add({ id, displayName: display||id, fileName: file, price, attributes: attrs, createdBy: auth.currentUser.uid, createdAt: Date.now() });
+    alert('Created');
+  }catch(e){ alert('Create variant failed: ' + (e.message||e)); }
 });
 
-/* update reset status UI */
-function updateResetStatus(votes){
-  const vs = votes || [];
-  if(!currentRoom){ el('resetStatus').textContent = ''; return; }
-  // display "x of y agreed"
-  // We can't easily get member count here (unless cached), so attempt to read members list quickly
-  db.collection('rooms').doc(currentRoom).collection('members').get().then(ms=>{
-    const members = []; ms.forEach(d=> members.push(d.id));
-    el('resetStatus').textContent = `${vs.length} / ${members.length} agreed`;
-  }).catch(()=> el('resetStatus').textContent = `${vs.length} votes`);
-}
-
-/* ============== Join/Host UI wiring ============== */
-el('hostBtn').addEventListener('click', async ()=>{
-  if(!db) initFirebase();
-  if(!auth) initFirebase();
-  try{ if(!auth.currentUser) await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){}
-  hostRoom();
-});
-
+/* ============== UI wiring ============== */
+el('hostBtn').addEventListener('click', async ()=> { if(!db) initFirebase(); if(!auth) initFirebase(); try{ if(!auth.currentUser) await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){} hostRoom(); });
 el('joinBtn').addEventListener('click', ()=>{ el('joinModal').style.display='flex'; setTimeout(()=> el('joinBox').classList.add('show'),10); });
 el('closeJoin').addEventListener('click', ()=>{ el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none',180); });
 el('joinConfirm').addEventListener('click', ()=>{ const code = el('joinCodeInput').value.trim(); if(!code) return alert('Enter code'); joinRoom(code); el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none',180); });
@@ -862,53 +951,14 @@ el('copyInviteBtn').addEventListener('click', ()=> {
 });
 leaveRoomBtn.addEventListener('click', ()=> { if(confirm('Leave room?')) leaveRoom(true); });
 
-/* ============== Variants admin wiring ============== */
-function renderVariants(items){
-  const wrap = el('variantsList'); wrap.innerHTML = '';
-  items.forEach(v=>{
-    const d = document.createElement('div'); d.className = 'variant-item';
-    d.innerHTML = `<div><strong>${v.displayName||v.id}</strong><div class="small-muted">${v.fileName}</div></div><div><button class="btn small">Select</button></div>`;
-    d.querySelector('button').addEventListener('click', ()=> { state.variant = v.fileName; scheduleWrite(); applyUI(); });
-    wrap.appendChild(d);
-  });
-}
-el('variantFile').addEventListener('input', (e)=> {
-  const v = e.target.value.trim(); if(!v){ el('variantPreview').style.display='none'; return; }
-  el('variantPreview').src = SPRITE_BASE_PATH + v; el('variantPreview').style.display='block';
-});
+/* chat open binding */
+el('chatBtn') && el('chatBtn').addEventListener('click', openChat);
 
-/* create variant */
-el('createVariant').addEventListener('click', async ()=>{
-  if(!db || !auth || !auth.currentUser) return alert('Sign-in required');
-  const id = el('variantId').value.trim(), display = el('variantDisplay').value.trim(), file = el('variantFile').value.trim(), price = Number(el('variantPrice').value||0);
-  let attrs = {};
-  try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid attributes JSON'); }
-  if(!id || !file) return alert('Provide id & file');
-  try{ await db.collection('variants').add({ id, displayName: display||id, fileName: file, price, attributes: attrs, createdBy: auth.currentUser.uid, createdAt: Date.now() }); alert('Created'); }catch(e){ alert('Error: '+e.message); }
-});
-
-/* attr modal */
-el('openAttr').addEventListener('click', ()=>{ el('attrModal').style.display='flex'; setTimeout(()=> el('attrBox').classList.add('show'),10); });
-el('attrClose').addEventListener('click', ()=>{ el('attrBox').classList.remove('show'); setTimeout(()=> el('attrModal').style.display='none',180); });
-el('attrApply').addEventListener('click', ()=> {
-  const cbs = el('attrBox').querySelectorAll('input[type="checkbox"][data-attr]'), vals = el('attrBox').querySelectorAll('.attr-val');
-  const a = {};
-  cbs.forEach((cb,i)=>{ if(cb.checked){ const k = cb.dataset.attr; const v = Number(vals[i].value); a[k] = isNaN(v) ? vals[i].value : v; }});
-  el('variantAttrs').value = JSON.stringify(a);
-  el('attrBox').classList.remove('show'); setTimeout(()=> el('attrModal').style.display='none',180);
-});
-
-/* ============== Initial UI bindings ============== */
-el('shopBtn').addEventListener('click', openShop);
-el('shopClose').addEventListener('click', closeShop);
-el('joinBtn').addEventListener('click', ()=>{ el('joinModal').style.display='flex'; setTimeout(()=> el('joinBox').classList.add('show'),10); });
-
-/* ============== Cleanup presence on unload (best effort) ============== */
+/* cleanup on unload (best-effort presence) */
 window.addEventListener('beforeunload', async ()=>{
   try{
     if(currentRoom && db && auth && auth.currentUser){
       await db.collection('rooms').doc(currentRoom).collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
-      // if host, and no members remain, delete room
       if(isHost){
         const members = await db.collection('rooms').doc(currentRoom).collection('members').limit(1).get();
         if(members.empty) await db.collection('rooms').doc(currentRoom).delete().catch(()=>{});
@@ -917,18 +967,37 @@ window.addEventListener('beforeunload', async ()=>{
   }catch(e){}
 });
 
-/* init UI and bindings */
+/* small helpers */
+function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
+
+/* init bindings on DOM ready */
 document.addEventListener('DOMContentLoaded', ()=> {
   applyUI();
-  // wire simple buttons
-  el('hostBtn').addEventListener('click', hostRoom);
-  el('joinBtn').addEventListener('click', ()=> { el('joinModal').style.display='flex'; setTimeout(()=> el('joinBox').classList.add('show'),10); });
+  el('shopBtn').addEventListener('click', openShop);
+  el('shopClose').addEventListener('click', closeShop);
+  el('chatClose').addEventListener('click', closeChat);
+  el('chatSend').addEventListener('click', sendChatMessage);
+  el('chatInput').addEventListener('keydown', (e)=> { if(e.key === 'Enter') sendChatMessage(); });
+  el('chatClear').addEventListener('click', async ()=> {
+    if(!currentRoom) return alert('Join a room first');
+    if(!confirm('Clear chat for everyone?')) return;
+    // delete messages
+    try{
+      const msgsRef = db.collection('rooms').doc(currentRoom).collection('messages');
+      const snap = await msgsRef.get();
+      const batch = db.batch();
+      snap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      alert('Chat cleared');
+    }catch(e){ console.warn('clear failed', e); alert('Clear failed'); }
+  });
+  el('resetBtn').addEventListener('click', ()=> { if(!currentRoom) return alert('Join a room first'); el('resetModal').style.display='flex'; setTimeout(()=> el('resetBox').classList.add('show'),10); });
 });
 
 /* expose debug */
 window.GubbyClicker = { state, saveState, loadState, openShop, hostRoom, joinRoom, leaveRoom };
 
-/* initial firebase call is already in initFirebase() above */
+/* end of script */
   </script>
 </body>
 </html>
