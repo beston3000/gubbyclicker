@@ -2,10 +2,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, increment, serverTimestamp, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-// Wait for the DOM to be fully loaded before running the script
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("Script loaded and running. DOM is ready.");
 
-    // 1. --- YOUR FIREBASE CONFIGURATION ---
+    // 1. --- FIREBASE CONFIGURATION ---
     const firebaseConfig = {
         apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
         authDomain: "gubby-clicker.firebaseapp.com",
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const db = getFirestore(app);
     const googleProvider = new GoogleAuthProvider();
 
-    // 3. --- DOM ELEMENT REFERENCES (MOVED INSIDE) ---
+    // 3. --- DOM ELEMENT REFERENCES ---
     const authContainer = document.getElementById('auth-container');
     const loginForm = document.getElementById('login-form');
     const signupForm = document.getElementById('signup-form');
@@ -30,8 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameScreen = document.getElementById('game-screen');
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d');
-
-    // Buttons
     const loginBtn = document.getElementById('login-btn');
     const signupBtn = document.getElementById('signup-btn');
     const googleLoginBtn = document.getElementById('google-login-btn');
@@ -41,24 +39,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const shopBtn = document.getElementById('shop-btn');
     const adminBtn = document.getElementById('admin-panel-btn');
     const addVariantBtn = document.getElementById('add-variant-btn');
-
-    // Stats
     const moneyStat = document.getElementById('money-stat');
     const hungerStat = document.getElementById('hunger-stat');
     const thirstStat = document.getElementById('thirst-stat');
     const energyStat = document.getElementById('energy-stat');
     const gubbyNameDisplay = document.getElementById('gubby-name-display');
     const roomCodeDisplay = document.getElementById('room-code-display');
-    
-    // Modals
-    const nameModal = document.getElementById('name-modal');
-    const shopModal = document.getElementById('shop-modal');
-    const adminModal = document.getElementById('admin-panel-modal');
 
     // 4. --- GAME STATE & CONSTANTS ---
     let currentUser = null;
     let currentRoomId = null;
-    let unsubscribeFromRoom = null; // To stop listening to room updates on logout
+    let unsubscribeFromRoom = null;
     let gubby = {
         x: 100, y: 100,
         width: 128, height: 128,
@@ -67,14 +58,14 @@ document.addEventListener('DOMContentLoaded', () => {
         isSleeping: false,
         isDead: false
     };
-    gubby.img.src = 'sprites/variants/default.png'; // Default sprite
+    gubby.img.src = 'sprites/variants/default.png';
 
-    const GAME_TICK_RATE = 2000; // Deplete stats every 2 seconds
-    const DAY_NIGHT_DURATION = 60000; // 1 minute day, 1 minute night
+    const GAME_TICK_RATE = 2000;
+    const DAY_NIGHT_DURATION = 60000;
     let lastTickTime = 0;
-    let timeOfDay = 0; // 0 to DAY_NIGHT_DURATION*2
+    let timeOfDay = 0;
     let isDay = true;
-    let gameLoopId = null; // To store the requestAnimationFrame ID
+    let gameLoopId = null;
 
     // --- HELPER FUNCTIONS ---
     function toggleAuthForms() {
@@ -88,14 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.random().toString(36).substring(2, 7).toUpperCase();
     }
 
-    // 5. --- AUTHENTICATION LOGIC ---
+    // --- AUTHENTICATION LOGIC ---
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
             authContainer.classList.add('hidden');
             roomSelection.classList.remove('hidden');
-            gameScreen.classList.add('hidden'); // Hide game until room is joined
-            
+            gameScreen.classList.add('hidden');
             await checkAdminStatus(user.uid);
         } else {
             currentUser = null;
@@ -105,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
             roomSelection.classList.add('hidden');
             gameScreen.classList.add('hidden');
             if (unsubscribeFromRoom) unsubscribeFromRoom();
-            if(gameLoopId) cancelAnimationFrame(gameLoopId);
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
         }
     });
 
@@ -165,23 +155,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 6. --- ROOM MANAGEMENT ---
+    // --- ROOM MANAGEMENT ---
     createRoomBtn.addEventListener('click', async () => {
         const roomId = generateRoomCode();
         const roomRef = doc(db, 'rooms', roomId);
         const defaultRoomState = {
             ownerId: currentUser.uid,
-            money: 0,
-            gubbyName: 'Gubby',
-            hunger: 100,
-            thirst: 100,
-            energy: 100,
+            money: 0, gubbyName: 'Gubby',
+            hunger: 100, thirst: 100, energy: 100,
             currentVariant: 'default.png',
-            upgrades: {
-                clickMultiplier: 1,
-            },
-            lastTick: serverTimestamp(),
-            createdAt: serverTimestamp()
+            upgrades: { clickMultiplier: 1 },
+            lastTick: serverTimestamp(), createdAt: serverTimestamp()
         };
         await setDoc(roomRef, defaultRoomState);
         joinRoom(roomId);
@@ -189,23 +173,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     joinRoomBtn.addEventListener('click', () => {
         const roomId = document.getElementById('room-code-input').value.toUpperCase();
-        if(roomId) joinRoom(roomId);
+        if (roomId) joinRoom(roomId);
     });
 
     async function joinRoom(roomId) {
         const roomRef = doc(db, 'rooms', roomId);
         const roomDoc = await getDoc(roomRef);
-
         if (roomDoc.exists()) {
             currentRoomId = roomId;
             roomSelection.classList.add('hidden');
             gameScreen.classList.remove('hidden');
             roomCodeDisplay.textContent = roomId;
-            
             if (roomDoc.data().gubbyName === 'Gubby') {
                 openModal('name-modal');
             }
-
             listenToRoomUpdates(roomId);
             startGameLoop();
         } else {
@@ -222,41 +203,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 7. --- REALTIME DATABASE LISTENER ---
+    // --- REALTIME DATABASE LISTENER ---
     function listenToRoomUpdates(roomId) {
         const roomRef = doc(db, 'rooms', roomId);
         if (unsubscribeFromRoom) unsubscribeFromRoom();
-
         unsubscribeFromRoom = onSnapshot(roomRef, (doc) => {
             const data = doc.data();
             if (!data) return;
-
             moneyStat.textContent = data.money;
             hungerStat.textContent = Math.round(data.hunger);
             thirstStat.textContent = Math.round(data.thirst);
             energyStat.textContent = Math.round(data.energy);
             gubbyNameDisplay.textContent = data.gubbyName;
-            
             gubby.isDead = data.hunger <= 0 || data.thirst <= 0;
             gubby.img.src = gubby.isDead ? 'sprites/dead.png' : `sprites/variants/${data.currentVariant}`;
         });
     }
     
-    function updateFirestoreState(field, value) {
-        if (!currentRoomId) return;
-        const roomRef = doc(db, 'rooms', currentRoomId);
-        updateDoc(roomRef, { [field]: value })
-            .catch(err => console.error("Error updating state:", err));
-    }
-    
     function incrementFirestoreState(field, amount) {
-         if (!currentRoomId) return;
+        if (!currentRoomId) return;
         const roomRef = doc(db, 'rooms', currentRoomId);
         updateDoc(roomRef, { [field]: increment(amount) })
             .catch(err => console.error("Error incrementing state:", err));
     }
 
-    // 8. --- CANVAS & GAME LOOP ---
+    // --- CANVAS & GAME LOOP ---
     function resizeCanvas() {
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
@@ -271,14 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function gameLoop(timestamp) {
         if (!currentRoomId) return;
-
         const deltaTime = timestamp - lastTickTime;
         lastTickTime = timestamp;
-
         updateGameLogic(deltaTime);
         updateGubbyMovement();
         render();
-
         gameLoopId = requestAnimationFrame(gameLoop);
     }
     
@@ -286,45 +254,36 @@ document.addEventListener('DOMContentLoaded', () => {
         timeOfDay = (timeOfDay + deltaTime) % (DAY_NIGHT_DURATION * 2);
         const wasDay = isDay;
         isDay = timeOfDay < DAY_NIGHT_DURATION;
-        
-        if(wasDay !== isDay) {
+        if (wasDay !== isDay) {
             gubby.isSleeping = !isDay;
             document.getElementById('day-night-overlay').style.opacity = isDay ? '0' : '0.4';
         }
-        
         const roomRef = doc(db, 'rooms', currentRoomId);
         const roomDoc = await getDoc(roomRef);
         if (!roomDoc.exists()) return;
         const data = roomDoc.data();
-
         if (data.ownerId === currentUser.uid) {
             const now = Date.now();
             const lastTick = data.lastTick.toDate().getTime();
             const ticksPassed = Math.floor((now - lastTick) / GAME_TICK_RATE);
-
-            if (ticksPassed > 0) {
-                if (!gubby.isDead) {
-                    const hungerLoss = ticksPassed * 1;
-                    const thirstLoss = ticksPassed * 1.5;
-                    const energyChange = gubby.isSleeping ? ticksPassed * 2 : ticksPassed * -0.5;
-                    
-                    updateDoc(roomRef, {
-                        hunger: increment(-hungerLoss),
-                        thirst: increment(-thirstLoss),
-                        energy: increment(energyChange),
-                        lastTick: serverTimestamp()
-                    });
-                }
+            if (ticksPassed > 0 && !gubby.isDead) {
+                const hungerLoss = ticksPassed * 1;
+                const thirstLoss = ticksPassed * 1.5;
+                const energyChange = gubby.isSleeping ? ticksPassed * 2 : ticksPassed * -0.5;
+                updateDoc(roomRef, {
+                    hunger: increment(-hungerLoss),
+                    thirst: increment(-thirstLoss),
+                    energy: increment(energyChange),
+                    lastTick: serverTimestamp()
+                });
             }
         }
     }
     
     function updateGubbyMovement() {
         if (gubby.isDead || gubby.isSleeping) return;
-
         gubby.x += gubby.vx;
         gubby.y += gubby.vy;
-
         if (gubby.x <= 0 || gubby.x + gubby.width >= canvas.width) gubby.vx *= -1;
         if (gubby.y <= 0 || gubby.y + gubby.height >= canvas.height) gubby.vy *= -1;
     }
@@ -333,20 +292,16 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#8c6d52';
         ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
-
         ctx.drawImage(gubby.img, gubby.x, gubby.y, gubby.width, gubby.height);
     }
 
-    // 9. --- GAME ACTIONS & CONTROLS ---
+    // --- GAME ACTIONS & CONTROLS ---
     canvas.addEventListener('click', async (event) => {
         if (gubby.isDead || gubby.isSleeping) return;
-
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-
-        if (x >= gubby.x && x <= gubby.x + gubby.width &&
-            y >= gubby.y && y <= gubby.y + gubby.height) {
+        if (x >= gubby.x && x <= gubby.x + gubby.width && y >= gubby.y && y <= gubby.y + gubby.height) {
             const roomRef = doc(db, 'rooms', currentRoomId);
             const roomDoc = await getDoc(roomRef);
             const clickPower = roomDoc.data().upgrades.clickMultiplier || 1;
@@ -355,73 +310,59 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     document.getElementById('feed-btn').addEventListener('click', () => {
-         incrementFirestoreState('money', -10);
-         incrementFirestoreState('hunger', 20);
-         incrementFirestoreState('energy', 5);
+        incrementFirestoreState('money', -10);
+        incrementFirestoreState('hunger', 20);
+        incrementFirestoreState('energy', 5);
     });
 
     document.getElementById('water-btn').addEventListener('click', () => {
-         incrementFirestoreState('money', -5);
-         incrementFirestoreState('thirst', 25);
+        incrementFirestoreState('money', -5);
+        incrementFirestoreState('thirst', 25);
     });
     
-    // 10. --- SHOP & ADMIN LOGIC ---
-    shopBtn.addEventListener('click', async () => {
-        const variantsCollectionRef = collection(db, 'variants');
-        const snapshot = await getDocs(variantsCollectionRef);
-        const variantsGrid = document.getElementById('variants-grid');
-        variantsGrid.innerHTML = '';
-        
-        snapshot.forEach(doc => {
-            const variant = doc.data();
-            const item = document.createElement('div');
-            item.className = 'shop-item';
-            
-            const img = document.createElement('img');
-            img.src = `sprites/variants/${variant.filename}`;
-            img.alt = variant.name;
-            
-            const name = document.createElement('h4');
-            name.textContent = variant.name;
-            
-            const desc = document.createElement('p');
-            desc.textContent = variant.description;
-            
-            const mult = document.createElement('p');
-            mult.textContent = `Multiplier: x${variant.multiplier}`;
-            
-            const buyBtn = document.createElement('button');
-            buyBtn.textContent = `Buy (💰${variant.price})`;
-            buyBtn.addEventListener('click', () => buyVariant(doc.id, variant.price));
-            
-            item.append(img, name, desc, mult, buyBtn);
-            variantsGrid.appendChild(item);
-        });
-        
-        openModal('shop-modal');
-    });
-    
-    // Make buyVariant globally accessible
-    window.buyVariant = async function(variantId, price) {
+    // --- SHOP & ADMIN LOGIC ---
+    async function buyVariant(variantId, price) {
         const roomRef = doc(db, 'rooms', currentRoomId);
         const roomDoc = await getDoc(roomRef);
         if (roomDoc.data().money >= price) {
             const variantRef = doc(db, 'variants', variantId);
             const variantDoc = await getDoc(variantRef);
             const variantData = variantDoc.data();
-            
             updateDoc(roomRef, {
                 money: increment(-price),
                 currentVariant: variantData.filename,
                 'upgrades.clickMultiplier': variantData.multiplier
             });
-
             alert(`You bought ${variantData.name}!`);
             closeModal('shop-modal');
         } else {
             alert("Not enough money!");
         }
     }
+
+    shopBtn.addEventListener('click', async () => {
+        const variantsCollectionRef = collection(db, 'variants');
+        const snapshot = await getDocs(variantsCollectionRef);
+        const variantsGrid = document.getElementById('variants-grid');
+        variantsGrid.innerHTML = '';
+        snapshot.forEach(docSnap => {
+            const variant = docSnap.data();
+            const item = document.createElement('div');
+            item.className = 'shop-item';
+            item.innerHTML = `
+                <img src="sprites/variants/${variant.filename}" alt="${variant.name}">
+                <h4>${variant.name}</h4>
+                <p>${variant.description}</p>
+                <p>Multiplier: x${variant.multiplier}</p>
+            `;
+            const buyBtn = document.createElement('button');
+            buyBtn.textContent = `Buy (💰${variant.price})`;
+            buyBtn.addEventListener('click', () => buyVariant(docSnap.id, variant.price));
+            item.appendChild(buyBtn);
+            variantsGrid.appendChild(item);
+        });
+        openModal('shop-modal');
+    });
     
     adminBtn.addEventListener('click', () => openModal('admin-panel-modal'));
     
@@ -431,26 +372,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const price = parseInt(document.getElementById('variant-price').value);
         const multiplier = parseFloat(document.getElementById('variant-multiplier').value);
         const description = document.getElementById('variant-description').value;
-        
-        if(!name || !filename || !price || !multiplier) {
+        if (!name || !filename || !price || !multiplier) {
             document.getElementById('admin-error').textContent = "All fields are required.";
             return;
         }
-        
         try {
             const newVariantRef = doc(collection(db, 'variants'));
-            await setDoc(newVariantRef, {
-                name, filename, price, multiplier, description
-            });
+            await setDoc(newVariantRef, { name, filename, price, multiplier, description });
             alert('Variant added successfully!');
             closeModal('admin-panel-modal');
-        } catch(err) {
+        } catch (err) {
             console.error("Admin error:", err);
             document.getElementById('admin-error').textContent = "You do not have permission or an error occurred.";
         }
     });
 
-    // Add event listeners for elements that used onclick
+    // --- ATTACH EVENT LISTENERS ---
     document.querySelectorAll('.toggle-link').forEach(link => {
         link.addEventListener('click', toggleAuthForms);
     });
