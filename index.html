@@ -3,14 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Gubby Clicker — refreshed</title>
+<title>Gubby Clicker — Firestore Multiplayer</title>
 
 <style>
 :root{
   --bg1:#ffffff; --bg2:#f5fbff;
   --accent:#6bc8ff; --accent2:#89ddff;
-  --muted:#6b7280;
-  --card: #fff;
+  --muted:#6b7280; --card:#fff;
 }
 *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
 html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center}
@@ -88,7 +87,7 @@ textarea{min-height:80px}
   <header>
     <div class="header-left">
       <div class="logo">G</div>
-      <div><h1>Gubby Clicker</h1><div class="small-muted">Roblox-themed clicker — P2P multiplayer</div></div>
+      <div><h1>Gubby Clicker</h1><div class="small-muted">Firestore multiplayer — easier to join</div></div>
     </div>
     <div class="top-controls">
       <div id="backpackUI" class="backpack">
@@ -119,18 +118,22 @@ textarea{min-height:80px}
         <button id="waterBtn" class="secondary">Give Water</button>
         <button id="colaBtn" class="secondary">Bloxy Cola</button>
         <button id="playBtn" class="secondary">Play</button>
-        <button id="inviteBtn" class="secondary">Invite Friend</button>
+        <button id="hostBtn" class="secondary">Host Game</button>
         <button id="joinBtn" class="secondary">Join Game</button>
       </div>
-      <div class="small-muted">Click Gubby to get clicks. All actions sync to other players.</div>
+      <div class="small-muted">Click Gubby to get clicks. All actions sync to other players in the same room.</div>
     </div>
 
     <div class="right-col">
       <div class="panel">
         <strong>Connection</strong>
-        <div style="margin-top:8px" class="compact">Simplified manual P2P: invite or join with a code.</div>
-        <div style="margin-top:8px;display:flex;gap:8px">
+        <div style="margin-top:8px" class="compact">Firestore rooms — Host a room and share its 4-letter code.</div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
           <div id="connectionStatus" class="compact">Not connected</div>
+          <div id="roomPanel" style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <div class="compact" id="roomCodeDisplay" style="font-weight:800"></div>
+            <button id="leaveRoomBtn" class="ghost" style="display:none">Leave Room</button>
+          </div>
         </div>
       </div>
 
@@ -175,24 +178,11 @@ textarea{min-height:80px}
   </div>
 </div>
 
-<!-- Invite modal (shows the invite/answer code if clipboard copy fails) -->
-<div class="modal-backdrop" id="inviteModal">
-  <div class="modal" id="inviteBox" style="max-width:560px">
-    <h3 style="margin:0 0 8px 0">Invite Code</h3>
-    <p class="compact">If the invite didn't copy to clipboard automatically, copy it here and send to your friend.</p>
-    <textarea id="inviteCodeArea" style="width:100%;height:120px;margin-top:8px"></textarea>
-    <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
-      <button id="copyInviteBtn" class="secondary">Copy</button>
-      <button id="closeInviteModal" class="secondary">Close</button>
-    </div>
-  </div>
-</div>
-
 <!-- Join Modal -->
 <div class="modal-backdrop" id="joinModal">
   <div class="modal" id="joinBox">
     <h3 style="margin:0 0 8px 0">Join Game</h3>
-    <input id="joinCodeInput" placeholder="Paste invite code here"><br>
+    <input id="joinCodeInput" placeholder="Paste 4-letter room code here" maxlength="6"><br>
     <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
       <button id="joinConfirm" class="secondary">Join</button>
       <button id="closeJoinModal" class="secondary">Cancel</button>
@@ -228,7 +218,7 @@ textarea{min-height:80px}
   </div>
 </div>
 
-<!-- Firebase (optional) -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -271,10 +261,21 @@ const bpFood = document.getElementById('bpFood'), bpWater = document.getElementB
 const clicksCounter = document.getElementById('clicksCounter');
 const shopModal = document.getElementById('shopModal'), shopBox = document.getElementById('shopBox'), shopGrid = document.getElementById('shopGrid');
 
-/* peer messaging security: per-sender sequence numbers */
-const peerSeq = {}; // peerId -> last seq received
-let localSeq = 0;
+const connectionStatus = document.getElementById('connectionStatus');
+const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+
+/* peer-ish vars for Firestore sync */
 let myPeerId = randomId();
+let localSeq = 0;
+const peerSeq = {}; // track last seq from remote
+let currentRoom = null;
+let roomUnsub = null;
+let isHost = false;
+
+/* debounce timer for writes to Firestore */
+let roomWriteTimer = null;
+const ROOM_WRITE_DEBOUNCE_MS = 600;
 
 /* WebAudio setup for merp with pitch jitter */
 let audioCtx = null, merpBuffer = null;
@@ -347,15 +348,13 @@ function renderShop(items){
     div.querySelector('.buy').addEventListener('click', ()=>{
       if(state.totalClicks < it.price) return alert('Not enough clicks');
       it.apply();
-      syncLocalAndPeers();
+      syncLocalAndRoom();
       applyUI();
-      broadcast({ t:'action', action:{ type:'purchase', id:it.id, price:it.price, by:myPeerId }, seq:++localSeq, from:myPeerId });
       alert('Purchased!');
     });
     shopGrid.appendChild(div);
   });
 }
-
 el('shopBtn').addEventListener('click', ()=> openShop());
 el('closeShop').addEventListener('click', closeShop);
 
@@ -369,8 +368,7 @@ function clickGubbyLocal(){
   state.hunger = Math.max(0, state.hunger - 0.1);
   state.thirst = Math.max(0, state.thirst - 0.2);
   playMerp();
-  broadcast({ t:'action', action:{ type:'click', value:power, by:myPeerId }, seq:++localSeq, from:myPeerId });
-  syncLocalAndPeers();
+  syncLocalAndRoom();
 }
 gubbySprite.addEventListener('click', ()=> clickGubbyLocal());
 
@@ -381,13 +379,12 @@ function useBackpack(type){
   if(type === 'food') state.hunger = Math.min(100, state.hunger + 25);
   if(type === 'water') state.thirst = Math.min(100, state.thirst + 25);
   if(type === 'cola') state.energy = Math.min(100, state.energy + 50);
-  broadcast({ t:'action', action:{ type:'use_item', item:type, by:myPeerId, count: state.backpack[type] }, seq:++localSeq, from:myPeerId });
-  syncLocalAndPeers();
+  syncLocalAndRoom();
 }
 el('feedBtn').addEventListener('click', ()=> useBackpack('food'));
 el('waterBtn').addEventListener('click', ()=> useBackpack('water'));
 el('colaBtn').addEventListener('click', ()=> useBackpack('cola'));
-el('playBtn').addEventListener('click', ()=> { state.energy = Math.min(100, state.energy + 8); broadcast({ t:'action', action:{ type:'play', by:myPeerId }, seq:++localSeq, from:myPeerId }); syncLocalAndPeers(); });
+el('playBtn').addEventListener('click', ()=> { state.energy = Math.min(100, state.energy + 8); syncLocalAndRoom(); });
 
 /* movement drains energy when wander occurs */
 function wander(){
@@ -403,8 +400,7 @@ function wander(){
   state.energy = Math.max(0, state.energy - energyLoss);
   gubbySprite.style.left = newX + 'px';
   gubbySprite.style.top = newY + 'px';
-  broadcast({ t:'action', action:{ type:'move', x:newX, y:newY, energyLoss, by:myPeerId }, seq:++localSeq, from:myPeerId });
-  syncLocalAndPeers();
+  syncLocalAndRoom();
 }
 setInterval(wander, 3000);
 
@@ -418,20 +414,19 @@ setInterval(()=>{
   if(state.hunger === 0 || state.thirst ===0) state.energy = Math.max(0, state.energy - 2);
   if(state.upgrades.autoClicks > 0) {
     addClicks(state.upgrades.autoClicks);
-    broadcast({ t:'action', action:{ type:'auto_click', value: state.upgrades.autoClicks, by:myPeerId }, seq:++localSeq, from:myPeerId });
   }
   if(state.energy <= 0 || state.hunger <= 0 || state.thirst <= 0){
     state.alive = false;
-    broadcast({ t:'gameover', seq:++localSeq, from:myPeerId });
+    syncLocalAndRoom(); // also broadcast game over via room state
     showGameOver();
   }
-  syncLocalAndPeers();
+  syncLocalAndRoom();
 }, 10000);
 
 /* add clicks helper */
 function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyUI(); }
 
-/* =========== Game Over modal (sync across peers) =========== */
+/* =========== Game Over modal (sync across players) =========== */
 function showGameOver(){
   const backdrop = el('gameOverBackdrop');
   const box = el('gameOverBox');
@@ -446,138 +441,223 @@ function hideGameOver(){
 }
 el('restartBtn').addEventListener('click', ()=> {
   state = JSON.parse(JSON.stringify(defaultState));
-  broadcast({ t:'game_reset', state, seq:++localSeq, from:myPeerId });
+  syncLocalAndRoom();
   saveState(); applyUI(); hideGameOver();
 });
 el('closeGameOver').addEventListener('click', ()=> hideGameOver());
 
-/* ============ P2P WebRTC Manual Signaling (preserve logic but wire to new UI) ============ */
-let pc = null, dc = null, isHost = false, lastOfferId = null;
+/* ============ Firestore-based rooms (replace P2P) ============ */
 
-function preparePeerConnection(){
-  const config = { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] };
-  pc = new RTCPeerConnection(config);
-  pc.onicecandidate = ()=> {
-    // when gathering completes, build the offer/answer object and copy to clipboard or show modal
-    if(pc.iceGatheringState === 'complete'){
-      // If we are the offerer, host path will call startHostInvite which set lastOfferId
-      const out = { type:'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from:myPeerId, name: user?.displayName || user?.email || 'guest' };
-      const b64 = btoa(JSON.stringify(out));
-      // Try to copy automatically
-      navigator.clipboard?.writeText(b64).then(()=>{
-        alert('Invite copied to clipboard — send it to your friend.');
-      }).catch(()=>{
-        // show invite modal so user can manually copy
-        el('inviteCodeArea').value = b64;
-        el('inviteModal').style.display = 'flex';
-        setTimeout(()=> el('inviteBox').classList.add('show'), 10);
-      });
+/* Initialize firebase (called lazily by initFirebase) */
+function initFirebase(){
+  if(window.firebase && !db){
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    // auth state listener
+    auth.onAuthStateChanged(async u=>{
+      if(u){ user = u;
+        // ensure user doc exists & show admin if admin
+        try{
+          const userRef = db.collection('users').doc(u.uid);
+          const userDoc = await userRef.get();
+          if(!userDoc.exists) await userRef.set({ displayName:u.displayName||u.email||'guest', email:u.email||null, privileges:'normal', createdAt:Date.now() });
+          const profile = (await userRef.get()).data();
+          if(profile?.privileges==='admin') el('adminPanel').style.display='block'; else el('adminPanel').style.display='none';
+        }catch(e){ console.warn('user profile check failed', e); }
+      } else { user = null; el('adminPanel').style.display='none'; }
+      applyUI();
+    });
+    // listen to available variants (same as before)
+    db.collection('variants').onSnapshot(snap => renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))));
+  }
+}
+
+/* ensure firebase is initialized and sign in anonymously if necessary */
+async function ensureFirebaseAndAuth(){
+  if(!window.firebase) return alert('Firebase SDK missing');
+  if(!db) initFirebase();
+  if(!auth) return alert('Auth failed');
+  if(!auth.currentUser){
+    try{
+      await auth.signInAnonymously();
+    }catch(e){ console.warn('anon sign-in failed', e); alert('Sign-in failed: '+e.message); }
+  }
+}
+
+/* generate short 4-letter room code */
+function randomRoomCode(){
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // drop confusing letters
+  let s = '';
+  for(let i=0;i<4;i++) s += letters[Math.floor(Math.random()*letters.length)];
+  return s;
+}
+
+/* Host a room: create doc and start listening */
+async function hostGame(){
+  try{
+    if(!db) initFirebase();
+    if(!auth) initFirebase();
+    if(!auth.currentUser) await auth.signInAnonymously();
+  }catch(e){}
+  if(currentRoom) return alert('Already in a room. Leave first.');
+  // try to generate a free code (up to N attempts)
+  for(let attempt=0; attempt<6; attempt++){
+    const code = randomRoomCode();
+    const docRef = db.collection('rooms').doc(code);
+    const doc = await docRef.get();
+    if(!doc.exists){
+      // create initial room doc (host writes authoritative state)
+      isHost = true;
+      currentRoom = code;
+      const roomData = {
+        state: state,
+        from: myPeerId,
+        seq: ++localSeq,
+        hostUid: auth.currentUser?.uid || null,
+        createdAt: Date.now()
+      };
+      await docRef.set(roomData);
+      listenToRoom(code);
+      updateConnectionUI(true, code);
+      alert('Room created — code: ' + code + '. Share it with your friends.');
+      return;
     }
+  }
+  alert('Failed to create a room — try again.');
+}
+
+/* Join a room by code */
+async function joinGame(code){
+  if(!code) return alert('Enter room code');
+  try{
+    if(!db) initFirebase();
+    if(!auth) initFirebase();
+    if(!auth.currentUser) await auth.signInAnonymously();
+  }catch(e){}
+  code = code.trim().toUpperCase();
+  const docRef = db.collection('rooms').doc(code);
+  const doc = await docRef.get();
+  if(!doc.exists) return alert('Room not found: ' + code);
+  // join and listen
+  isHost = false;
+  currentRoom = code;
+  listenToRoom(code);
+  updateConnectionUI(true, code);
+  alert('Joined room ' + code);
+}
+
+/* Listen to room document and merge incoming states */
+function listenToRoom(code){
+  if(roomUnsub) roomUnsub(); roomUnsub = null;
+  const docRef = db.collection('rooms').doc(code);
+  roomUnsub = docRef.onSnapshot(snap => {
+    if(!snap.exists){
+      // room closed
+      showStatus('Room closed');
+      leaveRoom(false);
+      return;
+    }
+    const data = snap.data();
+    if(!data) return;
+    // if incoming update comes from us, ignore merging (we already applied)
+    const seq = Number(data.seq || 0);
+    const from = data.from;
+    if(from === myPeerId) {
+      // ignore (our own echo)
+      return;
+    }
+    // simple seq protection
+    const prev = peerSeq[from] || 0;
+    if(seq <= prev) return;
+    peerSeq[from] = seq;
+    // merge remote state
+    if(data.state) mergeRemoteState(data.state);
+  }, err => {
+    console.warn('Room listen error', err);
+    showStatus('Room listener error');
+  });
+}
+
+/* Write local state into room doc (debounced) */
+function scheduleRoomWrite(){
+  if(!currentRoom) return;
+  if(roomWriteTimer) clearTimeout(roomWriteTimer);
+  roomWriteTimer = setTimeout(()=> {
+    const docRef = db.collection('rooms').doc(currentRoom);
+    const payload = {
+      state: state,
+      from: myPeerId,
+      seq: ++localSeq,
+      lastUpdated: Date.now()
+    };
+    // write using set merge to avoid clobbering metadata if host added extra fields
+    docRef.set(payload, { merge: true }).catch(e => console.warn('room write failed', e));
+  }, ROOM_WRITE_DEBOUNCE_MS);
+}
+
+/* immediate write (rarely needed) */
+function writeRoomNow(){
+  if(!currentRoom) return;
+  const docRef = db.collection('rooms').doc(currentRoom);
+  const payload = {
+    state: state,
+    from: myPeerId,
+    seq: ++localSeq,
+    lastUpdated: Date.now()
   };
-  pc.ondatachannel = ev => { dc = ev.channel; setupDataChannel(dc); };
-  pc.onconnectionstatechange = ()=> {
-    if(pc.connectionState === 'connected') showStatus('Peer connected');
-    else showStatus('Peer: ' + pc.connectionState);
-  };
+  docRef.set(payload, { merge: true }).catch(e => console.warn('room write failed', e));
 }
 
-function startHostInvite(){
-  if(pc) return alert('Already connected; disconnect first.');
-  isHost = true; lastOfferId = randomId();
-  preparePeerConnection();
-  dc = pc.createDataChannel('gubby');
-  setupDataChannel(dc);
-  pc.createOffer().then(o => pc.setLocalDescription(o)).then(()=>{
-    // iceGathering will handle producing the base64 invite and copying it when complete
-    alert('Invite created — waiting for ICE to finish gathering. The invite will be copied to clipboard automatically when ready.');
-  }).catch(e=>{ console.error(e); alert('Offer failed: '+e.message); });
+/* sync local changes to room (called by game actions) */
+function syncLocalAndRoom(){
+  saveState(); applyUI();
+  if(currentRoom) scheduleRoomWrite();
 }
 
-/* Setup data channel (same as original) */
-function setupDataChannel(channel){
-  channel.onopen = ()=> { showStatus('Data channel open'); send({ t:'presence', id:myPeerId, seq:++localSeq, from:myPeerId, name:user?.displayName || user?.email || 'guest' }); };
-  channel.onmessage = ev => { try{ const msg = JSON.parse(ev.data); handleMessage(msg); }catch(e){ console.warn('Bad message', e); } };
-  channel.onclose = ()=> showStatus('Data channel closed');
+/* Leave room. If host, delete room doc; otherwise just unsubscribe */
+async function leaveRoom(userRequested=true){
+  if(!currentRoom) return;
+  const code = currentRoom;
+  if(roomUnsub) { roomUnsub(); roomUnsub = null; }
+  if(isHost){
+    try{ await db.collection('rooms').doc(code).delete(); }catch(e){ console.warn('Failed to delete room', e); }
+  }
+  currentRoom = null;
+  isHost = false;
+  roomCodeDisplay.textContent = '';
+  leaveRoomBtn.style.display = 'none';
+  showStatus('Not connected');
+  if(userRequested) alert('Left room ' + code);
 }
 
-/* basic validation + anti-replay */
-function validateMsg(msg){
-  if(!msg || typeof msg !== 'object') return false;
-  if(!msg.t || !msg.from) return false;
-  const seq = Number(msg.seq || 0);
-  const prev = peerSeq[msg.from] || 0;
-  if(seq <= prev) { console.warn('Dropping old/replayed msg', msg); return false; }
-  peerSeq[msg.from] = seq;
-  return true;
+/* show connection UI */
+function updateConnectionUI(connected, code){
+  if(connected){
+    showStatus('Connected');
+    roomCodeDisplay.textContent = code || '';
+    leaveRoomBtn.style.display = 'inline-block';
+  } else {
+    showStatus('Not connected');
+    roomCodeDisplay.textContent = '';
+    leaveRoomBtn.style.display = 'none';
+  }
 }
 
-function handleMessage(msg){
-  if(!validateMsg(msg)) return;
-  if(msg.t === 'presence'){ showStatus('Peer: '+(msg.name||msg.from)); return; }
-  if(msg.t === 'stateSync'){ if(msg.state) mergeRemoteState(msg.state); return; }
-  if(msg.t === 'action'){ if(msg.action) applyRemoteAction(msg.action); return; }
-  if(msg.t === 'gameover'){ state.alive = false; saveState(); applyUI(); showGameOver(); return; }
-  if(msg.t === 'game_reset'){ state = msg.state || JSON.parse(JSON.stringify(defaultState)); saveState(); applyUI(); hideGameOver(); return; }
-  console.log('recv msg', msg);
-}
-
-function send(obj){
-  if(!obj) return;
-  obj.seq = ++localSeq;
-  obj.from = myPeerId;
-  if(dc && dc.readyState === 'open') dc.send(JSON.stringify(obj));
-}
-
-/* wrapper for broadcasting action/state */
-function broadcast(obj){
-  send(obj);
-}
-
-/* host/guest invite processing */
-async function processInviteString(b64){
-  let obj=null;
-  try{ obj = JSON.parse(atob(b64)); }catch(e){ return alert('Invalid invite format'); }
-  if(obj.type === 'offer'){
-    // act as answerer
-    isHost = false; lastOfferId = obj.id;
-    preparePeerConnection();
-    try{
-      await pc.setRemoteDescription({ type:'offer', sdp: obj.sdp });
-      const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
-      const answerObj = { type:'answer', sdp: pc.localDescription.sdp, id: obj.id, from: myPeerId };
-      const b64Ans = btoa(JSON.stringify(answerObj));
-      navigator.clipboard?.writeText(b64Ans).then(()=> {
-        alert('Answer copied to clipboard — send it back to host.');
-      }).catch(()=> {
-        el('inviteCodeArea').value = b64Ans;
-        el('inviteModal').style.display = 'flex';
-        setTimeout(()=> el('inviteBox').classList.add('show'), 10);
-      });
-      alert('Answer created — send it back to host.');
-    }catch(e){ console.error(e); alert('Failed to process offer: '+e.message); }
-  } else if(obj.type === 'answer'){
-    if(!pc) return alert('No offer present — host must create invite first.');
-    try{
-      await pc.setRemoteDescription({ type:'answer', sdp: obj.sdp });
-      alert('Answer processed — trying to connect.');
-    }catch(e){ alert('Failed to apply answer: '+e.message); }
-  } else alert('Unknown invite type: '+obj.type);
-}
-
-/* disconnect */
-function disconnectPeer(){ try{ if(dc) dc.close(); }catch(e){} try{ if(pc) pc.close(); }catch(e){} dc=null; pc=null; isHost=false; lastOfferId=null; showStatus('Disconnected'); }
-
-/* =========== Remote actions handling =========== */
+/* =========== Remote actions handling (same merge/apply logic) =========== */
 function mergeRemoteState(remote){
   if(!remote) return;
+  // prefer highest totalClicks
   if(remote.totalClicks > state.totalClicks){
     state.totalClicks = remote.totalClicks;
     state.upgrades = remote.upgrades || state.upgrades;
     state.variant = remote.variant || state.variant;
   }
+  // backpack: take max (simple merge strategy)
   state.backpack.food = Math.max(state.backpack.food, remote.backpack?.food || 0);
   state.backpack.water = Math.max(state.backpack.water, remote.backpack?.water || 0);
   state.backpack.cola = Math.max(state.backpack.cola, remote.backpack?.cola || 0);
+  // average bars
   state.hunger = Math.round((state.hunger + (remote.hunger||state.hunger))/2);
   state.thirst = Math.round((state.thirst + (remote.thirst||state.thirst))/2);
   state.energy = Math.round((state.energy + (remote.energy||state.energy))/2);
@@ -596,22 +676,8 @@ function applyRemoteAction(action){
   if(!state.alive && (state.hunger <=0 || state.thirst<=0 || state.energy<=0)) showGameOver();
 }
 
-/* =========== Firebase admin (optional, lazy init) =========== */
-function initFirebase(){
-  if(window.firebase && !auth){
-    firebase.initializeApp(firebaseConfig);
-    auth = firebase.auth();
-    db = firebase.firestore();
-    auth.onAuthStateChanged(async u=>{
-      if(u){ user = u; try{ const userRef = db.collection('users').doc(u.uid); const doc = await userRef.get(); if(!doc.exists) await userRef.set({ displayName:u.displayName||u.email.split('@')[0], email:u.email, privileges:'normal', createdAt:Date.now() }); const profile = (await userRef.get()).data(); if(profile.privileges==='admin') el('adminPanel').style.display='block'; else el('adminPanel').style.display='none'; }catch(e){ console.warn(e); } }
-      else { user = null; el('adminPanel').style.display='none'; }
-      applyUI();
-    });
-    db.collection('variants').onSnapshot(snap => renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))));
-    db.collection('shop').onSnapshot(snap => {/* optional */});
-  }
-}
-el('googleSignIn').addEventListener('click', ()=> { if(!auth) initFirebase(); if(!auth) return alert('Firebase init failed'); const provider = new firebase.auth.GoogleAuthProvider(); auth.signInWithPopup(provider).catch(e=>alert('Sign in failed: '+e.message)); });
+/* =========== Firebase admin wiring (variants / users) =========== */
+el('googleSignIn').addEventListener('click', ()=> { if(!db) initFirebase(); if(!auth) initFirebase(); if(!auth) return alert('Firebase init failed'); const provider = new firebase.auth.GoogleAuthProvider(); auth.signInWithPopup(provider).catch(e=>alert('Sign in failed: '+e.message)); });
 
 /* admin create variant */
 el('createVariantBtn')?.addEventListener('click', async ()=>{
@@ -629,37 +695,39 @@ el('createVariantBtn')?.addEventListener('click', async ()=>{
 /* render firestore variants */
 function renderVariantsFromFirestore(items){
   const wrap = el('variantsList'); wrap.innerHTML = '';
-  items.forEach(v=>{ const d = document.createElement('div'); d.className='variant-item'; d.textContent = `${v.displayName || v.id} — ${v.fileName}${v.price? ' — '+v.price:''}`; d.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndPeers(); }); wrap.appendChild(d); });
+  items.forEach(v=>{ const d = document.createElement('div'); d.className='variant-item'; d.textContent = `${v.displayName || v.id} — ${v.fileName}${v.price? ' — '+v.price:''}`; d.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndRoom(); }); wrap.appendChild(d); });
 }
 
-/* =========== Sync & save =========== */
-function syncLocalAndPeers(){ saveState(); applyUI(); if(dc && dc.readyState==='open') send({ t:'stateSync', state, seq:++localSeq, from:myPeerId }); }
+/* =========== Sync & save helper =========== */
+function syncLocalAndPeers(){ saveState(); applyUI(); /* legacy name: no-op now */ }
+function syncLocalAndRoom(){ saveState(); applyUI(); if(currentRoom) scheduleRoomWrite(); }
 
 /* expose debug */
-window.GubbyClicker = { state, saveState, loadState, openShop, startHostInvite: startHostInvite, processInviteString: processInviteString, disconnectPeer };
+window.GubbyClicker = { state, saveState, loadState, openShop, hostGame, joinGame, leaveRoom };
 
-/* finalize UI */
-applyUI();
+/* ============== UI: host/join modals and attr picker wiring ============== */
+el('hostBtn').addEventListener('click', async ()=> {
+  try{
+    if(!db) initFirebase();
+    if(!auth) initFirebase();
+    if(!auth.currentUser) await auth.signInAnonymously();
+  }catch(e){}
+  hostGame();
+});
 
-/* ============== UI: invite/join modals and attr picker wiring ============== */
-el('inviteBtn').addEventListener('click', ()=> startHostInvite());
 el('joinBtn').addEventListener('click', ()=> {
   el('joinModal').style.display='flex';
   setTimeout(()=> el('joinBox').classList.add('show'), 10);
 });
 el('closeJoinModal').addEventListener('click', ()=> { el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none', 220); });
 el('joinConfirm').addEventListener('click', ()=> {
-  const code = el('joinCodeInput').value.trim(); if(!code) return alert('Paste invite first'); processInviteString(code);
+  const code = el('joinCodeInput').value.trim(); if(!code) return alert('Paste invite first');
+  joinGame(code);
   el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none', 240);
 });
 
-/* invite modal copy/close */
-el('copyInviteBtn').addEventListener('click', ()=> {
-  const text = el('inviteCodeArea').value;
-  if(!text) return alert('No code');
-  navigator.clipboard?.writeText(text).then(()=> alert('Copied'), ()=> alert('Copy failed'));
-});
-el('closeInviteModal').addEventListener('click', ()=> { el('inviteBox').classList.remove('show'); setTimeout(()=> el('inviteModal').style.display='none', 220); });
+/* Leave room button */
+leaveRoomBtn.addEventListener('click', ()=> { if(confirm('Leave room?')) leaveRoom(true); });
 
 /* Attribute picker */
 el('openAttrPicker').addEventListener('click', ()=> {
@@ -672,7 +740,6 @@ el('applyAttr').addEventListener('click', ()=> {
   const checkboxes = el('attrBox').querySelectorAll('input[type="checkbox"][data-attr]');
   const vals = el('attrBox').querySelectorAll('.attr-val');
   const attrs = {};
-  // match them by index order
   checkboxes.forEach((cb, i) => {
     if(cb.checked){
       const attrName = cb.dataset.attr;
@@ -697,7 +764,7 @@ el('variantFile')?.addEventListener('input', (ev)=> {
 });
 
 /* helper to update connection status */
-function showStatus(s){ el('connectionStatus').textContent = s; }
+function showStatus(s){ connectionStatus.textContent = s; }
 
 /* finished wiring UI */
 
