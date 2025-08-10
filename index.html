@@ -1,352 +1,540 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Raise a Gubby</title>
-    <!-- 
-    A NOTE ON FIRESTORE RULES
-    These rules are essential for security and functionality.
-    - They allow anyone to read/write to the 'rooms' collection, which is necessary for multiplayer.
-    - They ensure that only logged-in users can create a user document for themselves.
-    - A user can only update their own document.
-    - The 'variants' collection is read-only for all users, so they can't cheat and change upgrade prices.
-      Only you (from the server/console) or an admin (if you build that rule) should write to it.
-      For the admin panel to work, we are adding a rule that allows users with the 'admin' privilege to write to the variants collection.
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gubby House — P2P Full Game</title>
 
-    THE RULES HAVE BEEN PROVIDED IN A SEPARATE DOCUMENT. PLEASE COPY THEM INTO YOUR FIRESTORE RULES EDITOR.
-    -->
-    <style>
-        :root {
-            --bg-color: #2c2f33;
-            --secondary-bg: #23272a;
-            --primary-text: #ffffff;
-            --accent-color: #7289da;
-            --accent-hover: #677bc4;
-            --danger-color: #f04747;
-            --success-color: #43b581;
-            --warning-color: #faa61a;
-            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            --border-radius: 8px;
-        }
-        body {
-            font-family: var(--font-family);
-            background-color: var(--bg-color);
-            color: var(--primary-text);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        #app-container {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        /* --- AUTH & ROOMS --- */
-        .screen {
-            background-color: var(--secondary-bg);
-            padding: 40px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            width: 400px;
-            text-align: center;
-        }
-        .screen h1 { margin-top: 0; }
-        .form-group { margin-bottom: 20px; text-align: left; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold;}
-        .form-group input {
-            width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-            background-color: var(--bg-color);
-            border: 1px solid #444;
-            border-radius: var(--border-radius);
-            color: var(--primary-text);
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: var(--accent-color);
-            border: none;
-            border-radius: var(--border-radius);
-            color: var(--primary-text);
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        button:hover { background-color: var(--accent-hover); }
-        #google-login-btn {
-            background-color: #4285F4;
-            margin-top: 10px;
-        }
-        #google-login-btn:hover {
-            background-color: #357ae8;
-        }
-        .toggle-link { margin-top: 20px; color: var(--accent-color); cursor: pointer; }
-        .error-message { color: var(--danger-color); margin-top: 15px; min-height: 20px;}
-        .divider {
-            display: flex; align-items: center; text-align: center; margin: 20px 0;
-        }
-        .divider::before, .divider::after {
-            content: ''; flex: 1; border-bottom: 1px solid #444;
-        }
-        .divider:not(:empty)::before { margin-right: .25em; }
-        .divider:not(:empty)::after { margin-left: .25em; }
+<!--
+  Gubby House — single-file standalone game with Google sign-in and P2P room (no server).
+  -------------------------------------------------------------------------------
+  IMPORTANT SETUP:
+  1) Replace GOOGLE_CLIENT_ID below with a Google OAuth Web client ID (from Google Cloud Console).
+     - For local testing you can create a credential with origin 'http://localhost' or use actual host.
+     - If you don't want Google login, you can click "Play as Guest".
+  2) Put your sprite files under /sprites/variants/ if you plan to host this file on GitHub Pages.
+     - For local testing: create a "sprites/variants" folder next to this HTML file and add images.
+  3) P2P Multiplayer (no server):
+     - This uses WebRTC but DOES NOT use any external signaling server.
+     - Signaling is manual: the host creates an invite string and shares it with a friend (copy/paste).
+     - The friend pastes that invite into their client, generates an answer string, and sends it back to the host (copy/paste).
+     - Once both sides complete the exchange, a direct P2P data channel is established.
+     - This is the only true way to do serverless signaling reliably from pure client code.
+  4) Security note:
+     - Google sign-in is used only to read the identity token client-side for display. There is no backend.
+     - Do NOT paste any secrets or server private keys into this file.
+-->
 
-        /* --- GAME SCREEN --- */
-        #game-screen {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
-        #game-canvas {
-            background-color: #3a3f44;
-            flex-grow: 1;
-        }
-        #hud {
-            display: flex;
-            justify-content: space-around;
-            padding: 10px;
-            background-color: var(--secondary-bg);
-            flex-wrap: wrap;
-        }
-        .stat { display: flex; align-items: center; font-size: 1.2em; }
-        .stat span { margin-left: 8px; }
-        #controls {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            padding: 10px;
-            background-color: var(--secondary-bg);
-        }
-        #controls button { width: auto; padding: 10px 20px;}
-        #admin-panel-btn { background-color: var(--warning-color); }
-        #logout-btn { background-color: var(--danger-color); }
-        #day-night-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000030;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 2s ease-in-out;
-        }
-
-        /* --- MODALS --- */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 100;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.6);
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background-color: var(--secondary-bg);
-            padding: 20px;
-            border-radius: var(--border-radius);
-            width: 80%;
-            max-width: 600px;
-            position: relative;
-        }
-        .close-btn {
-            color: #aaa;
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .shop-grid, .admin-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-        .shop-item {
-            background-color: var(--bg-color);
-            padding: 15px;
-            border-radius: var(--border-radius);
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .shop-item img {
-            width: 64px;
-            height: 64px;
-            object-fit: contain;
-            margin: 0 auto 10px auto;
-        }
-        .shop-item button { width: 100%; font-size: 14px; padding: 8px;}
-
-        /* --- GUBBY INFO --- */
-        #gubby-info {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.5);
-            padding: 10px 15px;
-            border-radius: var(--border-radius);
-        }
-        
-        .hidden { display: none !important; }
-    </style>
+<style>
+:root{--bg:#f3f7fb;--card:#fff;--accent:#6b8cff}
+*{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
+body{margin:0;min-height:100vh;background:linear-gradient(#e6f3ff,#f7fbff);display:flex;align-items:center;justify-content:center;padding:18px}
+.app{width:100%;max-width:1200px;background:var(--card);border-radius:12px;box-shadow:0 14px 40px rgba(10,10,30,0.12);overflow:hidden}
+header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #eef3ff}
+header h1{margin:0;font-size:18px}
+.main{display:grid;grid-template-columns:560px 1fr;gap:12px;padding:18px}
+.left{background:#f8fbff;border-radius:10px;padding:12px}
+.right{padding:12px}
+.house{width:520px;height:420px;background-image:linear-gradient(#fff,#def);border-radius:8px;position:relative;overflow:hidden;border:2px solid #e6f2ff}
+.gubby-sprite{position:absolute;transform:translate(-50%,-50%);width:96px;height:96px;transition:left .5s linear, top .5s linear, transform .2s}
+.hud{display:flex;gap:8px;margin-top:8px}
+.stat{background:white;padding:8px;border-radius:8px;border:1px solid #eef4ff;flex:1}
+.stat strong{display:block}
+.controls{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer}
+button.secondary{background:#eef3ff;color:#164ea6}
+.panel{background:#fff;padding:10px;border-radius:8px;border:1px solid #eef4ff;margin-bottom:12px}
+label{font-size:13px;color:#444}
+input[type=text], input[type=password], input[type=number], select, textarea{width:100%;padding:8px;margin-top:6px;border-radius:8px;border:1px solid #e6eef9}
+.small{font-size:12px;color:#667}
+.variants-list{display:flex;gap:8px;flex-wrap:wrap}
+.variant-pill{padding:6px 8px;border-radius:8px;border:1px solid #e6eef9;background:white;cursor:pointer}
+.admin-panel{display:none;border-top:1px dashed #e6eef9;padding-top:8px;margin-top:8px}
+.visible{display:block}
+.muted{color:#667;font-size:13px}
+.row{display:flex;gap:8px;align-items:center}
+footer{padding:12px;border-top:1px solid #f0f6ff;text-align:center;font-size:12px;color:#666}
+textarea{min-height:72px; font-family:monospace; white-space:pre-wrap}
+.notice{background:#fffbeb;border:1px solid #ffecb5;padding:8px;border-radius:8px}
+</style>
 </head>
 <body>
-
-    <div id="app-container">
-
-        <!-- AUTHENTICATION & ROOM SELECTION SCREEN -->
-        <div id="auth-container" class="screen">
-            <!-- Login Form -->
-            <div id="login-form">
-                <h1>Welcome Back!</h1>
-                <div class="form-group">
-                    <label for="login-email">Email</label>
-                    <input type="email" id="login-email" required>
-                </div>
-                <div class="form-group">
-                    <label for="login-password">Password</label>
-                    <input type="password" id="login-password" required>
-                </div>
-                <button id="login-btn">Login</button>
-                <div class="divider">OR</div>
-                <button id="google-login-btn">Sign in with Google</button>
-                <div class="error-message" id="login-error"></div>
-                <p class="toggle-link">Need an account? Sign Up</p>
-            </div>
-
-            <!-- Signup Form -->
-            <div id="signup-form" class="hidden">
-                <h1>Create Account</h1>
-                <div class="form-group">
-                    <label for="signup-email">Email</label>
-                    <input type="email" id="signup-email" required>
-                </div>
-                <div class="form-group">
-                    <label for="signup-password">Password</label>
-                    <input type="password" id="signup-password" required>
-                </div>
-                <button id="signup-btn">Sign Up</button>
-                <div class="error-message" id="signup-error"></div>
-                <p class="toggle-link">Already have an account? Login</p>
-            </div>
-            
-            <!-- Room Selection (shown after login) -->
-            <div id="room-selection" class="hidden">
-                <h1>Join a Room</h1>
-                <div class="form-group">
-                    <label for="room-code-input">Enter Room Code</label>
-                    <input type="text" id="room-code-input" placeholder="e.g., ABCDE">
-                </div>
-                <button id="join-room-btn">Join Room</button>
-                <div class="divider">OR</div>
-                <button id="create-room-btn">Create a New Room</button>
-                <div class="error-message" id="room-error"></div>
-            </div>
+  <div class="app" id="app">
+    <header>
+      <h1>Gubby House — P2P</h1>
+      <div style="margin-left:auto" id="authArea" class="muted small">Not signed in</div>
+    </header>
+    <div class="main">
+      <div class="left">
+        <div class="house" id="house">
+          <img id="gubbySprite" class="gubby-sprite" src="/sprites/variants/default.png" style="left:50%;top:60%" draggable="false" />
         </div>
 
-        <!-- MAIN GAME SCREEN -->
-        <div id="game-screen" class="hidden">
-            <div id="gubby-info">
-                <h2 id="gubby-name-display">Gubby</h2>
-                <p>Room Code: <b id="room-code-display"></b></p>
-            </div>
-            <div id="day-night-overlay"></div>
-            <canvas id="game-canvas"></canvas>
-            <div id="hud">
-                <div class="stat">💰 <span id="money-stat">0</span></div>
-                <div class="stat">🍔 <span id="hunger-stat">100</span>%</div>
-                <div class="stat">💧 <span id="thirst-stat">100</span>%</div>
-                <div class="stat">⚡ <span id="energy-stat">100</span>%</div>
-            </div>
-            <div id="controls">
-                <button id="feed-btn">Feed (Cost: 10)</button>
-                <button id="water-btn">Water (Cost: 5)</button>
-                <button id="shop-btn">Shop</button>
-                <button id="admin-panel-btn" class="hidden">Admin Panel</button>
-                <button id="logout-btn">Logout</button>
-            </div>
+        <div class="hud">
+          <div class="stat"><strong>Hunger <span id="hungerVal">0</span>%</strong><div class="small" id="hungerBar">—</div></div>
+          <div class="stat"><strong>Thirst <span id="thirstVal">0</span>%</strong><div class="small" id="thirstBar">—</div></div>
+          <div class="stat"><strong>Energy <span id="energyVal">0</span>%</strong><div class="small" id="energyBar">—</div></div>
         </div>
+
+        <div class="controls">
+          <button id="feedBtn">Feed</button>
+          <button id="waterBtn" class="secondary">Give Water</button>
+          <button id="colaBtn">Give Bloxy Cola</button>
+          <button id="playBtn" class="secondary">Play</button>
+          <button id="showInvite" class="secondary">Create Invite (host)</button>
+          <button id="pasteInvite" class="secondary">Paste Invite (join)</button>
+          <div style="margin-left:auto" class="small muted">P2P: manual copy/paste for serverless signaling</div>
+        </div>
+
+        <div style="margin-top:12px" class="panel">
+          <label>Connection & Messages</label>
+          <div class="row" style="gap:6px;align-items:flex-start">
+            <textarea id="inviteOut" placeholder="Invite / Answer will appear here (copy & send to friend)"></textarea>
+            <textarea id="inviteIn" placeholder="Paste friend's invite/answer here then press 'Process Invite'"></textarea>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button id="processInvite">Process Invite</button>
+              <button id="disconnectBtn" class="secondary">Disconnect</button>
+            </div>
+          </div>
+          <div style="margin-top:8px" class="muted small">How to connect (no server): Host: Create Invite → send the invite string to friend.
+            Friend: Paste that invite → press "Process Invite" → send the Answer back to host → Host pastes Answer and presses Process Invite to complete the handshake.</div>
+        </div>
+
+      </div>
+
+      <div class="right">
+        <div class="panel">
+          <label>Account / Login</label>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="googleSignIn" class="secondary">Sign in with Google</button>
+            <button id="guestBtn">Play as Guest</button>
+          </div>
+          <div id="accountInfo" class="muted small" style="margin-top:8px">—</div>
+        </div>
+
+        <div class="panel">
+          <label>Shop & Upgrades</label>
+          <div id="shopList" style="margin-top:8px"></div>
+        </div>
+
+        <div class="panel">
+          <label>Variants</label>
+          <div class="variants-list" id="variantsList"></div>
+        </div>
+
+        <div class="panel admin-panel" id="adminPanel">
+          <label>Admin Panel — Create Variant / Shop Item</label>
+          <div style="margin-top:8px">
+            <label>Variant ID</label>
+            <input type="text" id="variantId" placeholder="e.g. LavaGubby" />
+            <label style="margin-top:6px">File name (inside /sprites/variants/)</label>
+            <input type="text" id="variantFile" placeholder="e.g. lava.png" />
+            <label style="margin-top:6px">Price (clicks)</label>
+            <input type="number" id="variantPrice" value="500" />
+            <label style="margin-top:6px">Attributes (json) — e.g. {"clickMultiplier":2,"energyBonus":10}</label>
+            <input type="text" id="variantAttrs" placeholder='{"clickMultiplier":2,"energyBonus":10}' />
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button id="createVariantBtn">Create Variant Locally</button>
+              <button id="refreshVariants" class="secondary">Refresh</button>
+            </div>
+            <div class="muted small" style="margin-top:8px">Admin-only UI. This local build doesn't connect to Firestore; admin actions are local unless you add backend Firestore later.</div>
+          </div>
+        </div>
+
+      </div>
     </div>
+    <footer>Standalone P2P — create invite strings and exchange manually. Host files (sprites) under /sprites/variants/ if you want custom images.</footer>
+  </div>
 
-    <!-- MODALS -->
-    <div id="name-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" data-modal-id="name-modal">&times;</span>
-            <h2>Name Your Gubby!</h2>
-            <div class="form-group">
-                <label for="gubby-name-input">Gubby's Name</label>
-                <input type="text" id="gubby-name-input" maxlength="20">
-            </div>
-            <button id="save-name-btn">Save Name</button>
-        </div>
-    </div>
+<script>
+/* =================  CONFIG  =================
+   Insert your Google OAuth Client ID here (Web client id)
+   Create one in Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client IDs
+   Allowed origins should include the URL you're hosting this on (or http://localhost for testing).
+*/
+const GOOGLE_CLIENT_ID = 'GOOGLE_CLIENT_ID_HERE'; // <<< REPLACE THIS with your client id
 
-    <div id="shop-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" data-modal-id="shop-modal">&times;</span>
-            <h2>Shop</h2>
-            <h3>Upgrades</h3>
-            <div id="upgrades-grid" class="shop-grid">
-                <!-- Upgrades will be populated by JS -->
-            </div>
-            <h3>Gubby Variants</h3>
-            <div id="variants-grid" class="shop-grid">
-                <!-- Variants will be populated by JS -->
-            </div>
-        </div>
-    </div>
-    
-    <div id="admin-panel-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" data-modal-id="admin-panel-modal">&times;</span>
-            <h2>Admin Panel: Add Gubby Variant</h2>
-            <div class="form-group">
-                <label for="variant-name">Variant Name (e.g., Water Gubby)</label>
-                <input type="text" id="variant-name">
-            </div>
-            <div class="form-group">
-                <label for="variant-filename">Sprite Filename (e.g., water.png)</label>
-                <input type="text" id="variant-filename" placeholder="Must be in sprites/variants/">
-            </div>
-            <div class="form-group">
-                <label for="variant-price">Price</label>
-                <input type="number" id="variant-price" value="1000">
-            </div>
-            <div class="form-group">
-                <label for="variant-multiplier">Click Multiplier</label>
-                <input type="number" id="variant-multiplier" value="1.5" step="0.1">
-            </div>
-             <div class="form-group">
-                <label for="variant-description">Description (e.g., Resists thirst)</label>
-                <input type="text" id="variant-description">
-            </div>
-            <button id="add-variant-btn">Add Variant</button>
-            <div class="error-message" id="admin-error"></div>
-        </div>
-    </div>
+/* =============== Game / UI Code ============== */
+function el(id){ return document.getElementById(id); }
 
-    <!-- Link to the external JavaScript file with a cache-busting query string -->
-    <script type="module" src="script.js?v=1.1"></script>
+const defaultState = {
+  name: 'Gubby',
+  variant: 'default.png',
+  pos:{x:260,y:210},
+  hunger:80, thirst:80, energy:100, alive:true,
+  clicks:0, totalClicks:0,
+  upgrades:{clickPower:1, autoClicks:0, multipliers:[]}
+};
+let state = loadState();
+let user = {id:'guest', name:'Guest'};
+let pc = null;         // RTCPeerConnection
+let dc = null;         // DataChannel
+let isHost = false;
+let lastOfferId = null;
 
+const gubbySprite = el('gubbySprite');
+const hungerVal = el('hungerVal'), thirstVal = el('thirstVal'), energyVal = el('energyVal');
+const feedBtn = el('feedBtn'), waterBtn = el('waterBtn'), colaBtn = el('colaBtn'), playBtn = el('playBtn');
+const shopList = el('shopList'), variantsList = el('variantsList');
+const adminPanel = el('adminPanel');
+const authArea = el('authArea');
+const accountInfo = el('accountInfo');
+
+el('googleSignIn').addEventListener('click', signInWithGoogle);
+el('guestBtn').addEventListener('click', ()=> { user = {id:'guest_'+randomId(), name:'Guest'}; onSignedIn(); });
+el('feedBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.hunger = Math.min(100,state.hunger+25); syncLocalAndPeers(); });
+el('waterBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.thirst = Math.min(100,state.thirst+25); syncLocalAndPeers(); });
+el('colaBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100,state.energy+50); syncLocalAndPeers(); });
+el('playBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100,state.energy+10); addClicks(5); syncLocalAndPeers(); });
+
+el('showInvite').addEventListener('click', ()=>{ if(pc) { alert('Already initialized — disconnect first'); return; } startHostInvite(); });
+el('pasteInvite').addEventListener('click', ()=>{ const txt = prompt('Paste invite or answer JSON string here'); if(txt) { processInviteString(txt.trim()); }});
+el('processInvite').addEventListener('click', ()=>{ const s = el('inviteIn').value.trim(); if(!s) return alert('Paste invite/answer first'); processInviteString(s); });
+el('disconnectBtn').addEventListener('click', disconnectPeer);
+
+el('createVariantBtn').addEventListener('click', ()=>{ // local-only create
+  const id = el('variantId').value.trim(); const file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0; let attrs={};
+  try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON attrs'); }
+  if(!id || !file) return alert('id & file required');
+  const v = {id, fileName:file, price, attributes:attrs};
+  localVariants.push(v); renderVariantsClientSide(); alert('Variant created locally. To share it with peers, press Sync State to peers.'); syncLocalAndPeers();
+});
+
+el('refreshVariants').addEventListener('click', ()=> renderVariantsClientSide());
+
+let localVariants = [
+  {id:'Default', fileName:'default.png', price:0, attributes:{}},
+  {id:'Water', fileName:'water.png', price:100, attributes:{clickMultiplier:1.2}},
+  {id:'Lava', fileName:'lava.png', price:500, attributes:{clickMultiplier:1.5, energyBonus:10}}
+];
+
+function applyStateToUI(){
+  hungerVal.textContent = Math.round(state.hunger);
+  thirstVal.textContent = Math.round(state.thirst);
+  energyVal.textContent = Math.round(state.energy);
+  gubbySprite.src = `/sprites/variants/${state.variant}`;
+  authArea.textContent = `User: ${user.name}`;
+  accountInfo.textContent = `ID: ${user.id}`;
+}
+function saveState(){ localStorage.setItem('gubby_p2p_v1', JSON.stringify(state)); }
+function loadState(){ try{ const raw = localStorage.getItem('gubby_p2p_v1'); if(raw) return JSON.parse(raw); }catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
+
+function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyStateToUI(); }
+function getMultiplier(){ let m=1; if(state.upgrades.multipliers) state.upgrades.multipliers.forEach(v=>m*=v); return m; }
+
+function renderShop(){
+  shopList.innerHTML = '';
+  const builtins = [
+    {title:'Upgrade Click Power', price:100, action:()=>{ if(state.totalClicks < 100) return alert('Not enough clicks'); state.upgrades.clickPower += 1; state.totalClicks -= 100; syncLocalAndPeers(); }},
+    {title:'Auto Clicker', price:500, action:()=>{ if(state.totalClicks < 500) return alert('Not enough clicks'); state.upgrades.autoClicks += 1; state.totalClicks -= 500; syncLocalAndPeers(); }},
+    {title:'Multiplier x1.5', price:1500, action:()=>{ if(state.totalClicks < 1500) return alert('Not enough clicks'); state.upgrades.multipliers.push(1.5); state.totalClicks -= 1500; syncLocalAndPeers(); }}
+  ];
+  builtins.concat(localVariants).forEach(item => {
+    const div = document.createElement('div'); div.className='row'; div.style.justifyContent='space-between';
+    const name = item.title || (item.id? item.id : item.fileName);
+    const price = item.price||item.price|| (item.price===0?0: (item.price||100));
+    div.innerHTML = `<div><strong>${name}</strong><div class="small">Price: ${price} clicks</div></div><div><button>Buy</button></div>`;
+    div.querySelector('button').addEventListener('click', ()=>{
+      if(state.totalClicks < price) return alert('Not enough clicks');
+      state.totalClicks = Math.max(0, state.totalClicks - price);
+      // apply if variant
+      if(item.fileName){ state.variant = item.fileName; if(item.attributes){ if(item.attributes.clickMultiplier) state.upgrades.multipliers.push(item.attributes.clickMultiplier); if(item.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + item.attributes.autoClicks; if(item.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + item.attributes.clickPower; } }
+      if(item.action){ item.action(); }
+      syncLocalAndPeers();
+    });
+    shopList.appendChild(div);
+  });
+}
+
+function renderVariantsClientSide(){
+  variantsList.innerHTML = '';
+  localVariants.forEach(v => {
+    const pill = document.createElement('div'); pill.className='variant-pill'; pill.textContent = `${v.fileName} ${v.price? '— '+v.price:''}`;
+    pill.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndPeers(); });
+    variantsList.appendChild(pill);
+  });
+}
+
+// Movement (simple wander)
+const houseRect = {w:520,h:420};
+function wander(){ if(!state.alive) return; const margin = 48; const x = Math.random()*(houseRect.w - margin*2) + margin; const y = Math.random()*(houseRect.h - margin*2) + margin; state.pos.x = x; state.pos.y = y; gubbySprite.style.left = x + 'px'; gubbySprite.style.top = y + 'px'; }
+setInterval(wander, 3000);
+
+// decay & autos
+setInterval(()=> {
+  if(!state.alive) return;
+  state.hunger = Math.max(0, state.hunger - 1);
+  state.thirst = Math.max(0, state.thirst - 1.2);
+  const hour = (new Date()).getHours();
+  if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2);
+  else state.energy = Math.max(0, state.energy - 0.5);
+  if(state.hunger===0 || state.thirst===0) state.energy = Math.max(0, state.energy - 2);
+  if(state.energy===0){ state.alive=false; gubbySprite.src='/sprites/variants/dead.png'; }
+  if(state.upgrades.autoClicks>0 && state.alive){ addClicks(state.upgrades.autoClicks); }
+  syncLocalAndPeers(); // keep peers updated
+}, 10000);
+
+// click handler
+gubbySprite.addEventListener('click', ()=>{
+  if(!state.alive) return;
+  const power = state.upgrades.clickPower * getMultiplier();
+  addClicks(power);
+  state.energy = Math.max(0, state.energy - 1);
+  state.hunger = Math.max(0, state.hunger - 0.5);
+  state.thirst = Math.max(0, state.thirst - 0.7);
+  syncLocalAndPeers();
+});
+
+/* ============ Simple Google Sign-in (client-side) =============
+   Uses Google Identity Services (GSI) popup to get an ID token.
+   You MUST set GOOGLE_CLIENT_ID above.
+   This flow is purely client-side and reads user.name/email from the ID token payload.
+   No backend is used.
+*/
+function loadGoogleLibraryAndAttach(){
+  // load the GSI library script dynamically and then configure popup behavior
+  if(!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('GOOGLE_CLIENT_ID')) {
+    el('googleSignIn').textContent = 'Sign in with Google (set client id)';
+    return;
+  }
+  const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.defer = true;
+  s.onload = ()=> {
+    // use the popup credential flow on click
+    el('googleSignIn').addEventListener('click', ()=> {
+      /* global google */ // for linter
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGsiCredential
+      });
+      google.accounts.id.prompt(); // may show One Tap — we prefer popup.
+      // fallback: use popup credential via google.accounts.id.prompt (works in many cases).
+    });
+  };
+  document.head.appendChild(s);
+}
+function handleGsiCredential(resp){
+  // resp.credential is a JWT id_token; decode payload (base64)
+  const payload = parseJwt(resp.credential);
+  user = {id: payload.sub, name: payload.name || payload.email || 'GoogleUser', email: payload.email};
+  onSignedIn();
+}
+function signInWithGoogle(){
+  if(!window.google){
+    // GSI not yet loaded — attempt to load and then open sign-in
+    loadGoogleLibraryAndAttach();
+    alert('Google library loaded — click Sign in with Google again to open the prompt.');
+    return;
+  }
+  // If library loaded, call initialize+prompt
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGsiCredential });
+  google.accounts.id.prompt();
+}
+function parseJwt (token) {
+  try{
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  }catch(e){ return {}; }
+}
+function onSignedIn(){
+  applyStateToUI();
+  renderShop();
+  renderVariantsClientSide();
+  // update UI
+  authArea.textContent = `Signed in: ${user.name}`;
+  accountInfo.textContent = `ID: ${user.id} ${user.email? ' — '+user.email:''}`;
+  // Show admin UI if user id contains 'admin' (example local toggle)
+  if(user.email && user.email.endsWith('@youradmin.com')) adminPanel.classList.add('visible'); // change to desired rule
+}
+
+/* ================= P2P (WebRTC manual signaling) ===================
+   This implements a serverless manual signaling flow:
+   - Host: startHostInvite() -> creates RTCPeerConnection + DataChannel -> createOffer -> shows invite JSON in inviteOut.
+            Send that invite string to friend (e.g., chat)
+   - Guest: paste that invite into inviteIn and press ProcessInvite -> sets remote desc with offer, creates answer -> answer string appears in inviteOut.
+            Send answer string back to host.
+   - Host: paste guest answer into inviteIn and press ProcessInvite -> sets remote desc (answer) -> connection establishes.
+   Messages exchanged across datachannel synchronize game state.
+*/
+function randomId(){ return Math.random().toString(36).slice(2,9); }
+function startHostInvite(){
+  isHost = true;
+  lastOfferId = randomId();
+  preparePeerConnection();
+  // create data channel for game messages
+  dc = pc.createDataChannel('gubby');
+  setupDataChannel(dc);
+  pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(()=> {
+    // wait for localDescription to be set (should be immediate)
+    const invite = { type:'offer', sdp: pc.localDescription.sdp, id: lastOfferId, from: user.id, name:user.name };
+    el('inviteOut').value = btoa(JSON.stringify(invite));
+    alert('Invite created. Copy the invite string and send to friend. When friend sends back answer, paste it into the right box and click Process Invite.');
+  }).catch(err=>{ console.error(err); alert('Offer failed: '+err.message); });
+}
+
+function preparePeerConnection(){
+  const config = {iceServers: [{urls:['stun:stun.l.google.com:19302']}]}; // STUN only
+  pc = new RTCPeerConnection(config);
+  pc.onicecandidate = (ev)=> {
+    // Normally you'd send ICE candidates to the remote side; with manual SDP exchange we rely on trickle-less behavior,
+    // but ICE candidates may still be emitted. We append them into inviteOut when complete.
+    // This implementation will gather candidates into the inviteOut after ICE gathering finishes.
+    // Monitor when ICE gathering state complete:
+    if(pc.iceGatheringState === 'complete'){
+      // append ICE candidates into localDescription and update inviteOut
+      const full = { type: 'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from:user.id, name:user.name };
+      el('inviteOut').value = btoa(JSON.stringify(full));
+    }
+  };
+  pc.ondatachannel = (ev)=> {
+    dc = ev.channel;
+    setupDataChannel(dc);
+  };
+  pc.onconnectionstatechange = ()=> {
+    if(pc.connectionState === 'connected'){
+      console.log('Peer connected!');
+      showStatus('Peer connected');
+      // after connection, send local full state to peer
+      sendMessage({t:'stateSync', state});
+    }
+  };
+}
+
+function setupDataChannel(channel){
+  channel.onopen = ()=> { console.log('Data channel open'); showStatus('Data channel open'); };
+  channel.onmessage = (ev)=> {
+    try{
+      const msg = JSON.parse(ev.data);
+      handlePeerMessage(msg);
+    }catch(e){ console.log('Received raw:', ev.data); }
+  };
+  channel.onclose = ()=> { showStatus('Data channel closed'); };
+}
+
+function handlePeerMessage(msg){
+  if(msg.t === 'ping'){ sendMessage({t:'pong'}); return; }
+  if(msg.t === 'stateSync'){ // remote provided a full state -> merge conservatively
+    mergeRemoteState(msg.state);
+    return;
+  }
+  if(msg.t === 'action'){ // apply a small action (click/feed)
+    applyRemoteAction(msg.action);
+    return;
+  }
+  if(msg.t === 'chat'){ console.log('chat>', msg.text); }
+}
+
+function mergeRemoteState(remote){
+  // Keep these fields authoritative: choose highest totalClicks, latest energy/hunger by timestamp if present
+  if(!remote) return;
+  // naive: apply remote state to local (you may implement merges)
+  // We'll prefer a straightforward approach: if remote.totalClicks > local, copy their upgrades/variant etc.
+  if(remote.totalClicks > state.totalClicks){
+    state.totalClicks = remote.totalClicks;
+    state.upgrades = remote.upgrades || state.upgrades;
+    state.variant = remote.variant || state.variant;
+  }
+  // Update vital bars (average them)
+  state.hunger = Math.max(0, Math.min(100, Math.round((state.hunger + (remote.hunger||state.hunger))/2)));
+  state.thirst = Math.max(0, Math.min(100, Math.round((state.thirst + (remote.thirst||state.thirst))/2)));
+  state.energy = Math.max(0, Math.min(100, Math.round((state.energy + (remote.energy||state.energy))/2)));
+  saveState(); applyStateToUI();
+}
+
+function applyRemoteAction(action){
+  if(!action) return;
+  if(action.type === 'click'){ addClicks(action.value||1); }
+  if(action.type === 'feed'){ state.hunger = Math.min(100, state.hunger + (action.value||20)); }
+  if(action.type === 'water'){ state.thirst = Math.min(100, state.thirst + (action.value||20)); }
+  if(action.type === 'cola'){ state.energy = Math.min(100, state.energy + (action.value||40)); }
+  saveState(); applyStateToUI();
+}
+
+/* Process an invite/answer string pasted by the other peer.
+   Invite string is base64(JSON) produced by btoa(JSON.stringify(inviteObj))
+   inviteObj: { type:'offer'|'answer', sdp:..., id:..., from:..., name:... }
+*/
+async function processInviteString(b64str){
+  let obj=null;
+  try{ obj = JSON.parse(atob(b64str)); }catch(e){ return alert('Invalid invite format'); }
+  if(obj.type === 'offer'){
+    // we are the answerer (guest)
+    isHost = false;
+    lastOfferId = obj.id;
+    preparePeerConnection();
+    const desc = { type:'offer', sdp: obj.sdp };
+    await pc.setRemoteDescription(desc);
+    // create answer
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    // when localDescription populated, output the answer for the host to paste back
+    const answerObj = { type:'answer', sdp: pc.localDescription.sdp, id: obj.id, from:user.id, name:user.name };
+    el('inviteOut').value = btoa(JSON.stringify(answerObj));
+    alert('Answer created. Copy this answer and send it back to the host. When host pastes it, press Process Invite to finalize.');
+  } else if(obj.type === 'answer'){
+    // we are the host receiving an answer
+    if(!pc){ alert('No offer present on this client. Host must create an invite first.'); return; }
+    const desc = { type:'answer', sdp: obj.sdp };
+    await pc.setRemoteDescription(desc);
+    alert('Answer processed — connection should establish shortly (if NAT permits).');
+  } else {
+    alert('Unknown invite type: '+obj.type);
+  }
+}
+
+/* Send a message to peer via datachannel */
+function sendMessage(msg){
+  if(dc && dc.readyState === 'open'){ dc.send(JSON.stringify(msg)); }
+}
+
+/* Sync local state to peers (send full state) */
+function syncLocalAndPeers(){
+  saveState(); applyStateToUI();
+  if(dc && dc.readyState === 'open'){ sendMessage({t:'stateSync', state}); }
+}
+
+/* Disconnect and cleanup */
+function disconnectPeer(){
+  try{ if(dc) dc.close(); }catch(e){}
+  try{ if(pc) pc.close(); }catch(e){}
+  dc = null; pc = null; isHost = false; lastOfferId = null;
+  el('inviteOut').value = ''; el('inviteIn').value = '';
+  showStatus('Disconnected');
+}
+
+/* Show ephemeral status in console+UI */
+function showStatus(msg){
+  console.log('[status]', msg);
+  accountInfo.textContent = (user? user.name : 'guest') + ' — ' + msg;
+}
+
+/* Utility: apply local state and initial render */
+if(!state) state = JSON.parse(JSON.stringify(defaultState));
+applyStateToUI();
+renderShop();
+renderVariantsClientSide();
+
+/* small helpers */
+function randomId(){ return Math.random().toString(36).slice(2,9); }
+
+/* Expose a simple API for local testing (dev console) */
+window.gubbyP2P = {
+  state, saveState, loadState, disconnectPeer, startHostInvite, processInviteString
+};
+
+/* Attempt to load Google library automatically for convenience */
+(function autoLoadGSI(){
+  if(GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('GOOGLE_CLIENT_ID')){
+    const s = document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true; s.defer=true;
+    s.onload = ()=> console.log('GSI loaded. Use Sign in with Google button.');
+    document.head.appendChild(s);
+  } else {
+    el('googleSignIn').textContent = 'Sign in with Google (set client id)';
+  }
+})();
+</script>
 </body>
 </html>
