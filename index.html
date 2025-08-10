@@ -3,26 +3,42 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Gubby House — P2P Full Game</title>
+<title>Gubby House — Full Game (P2P + Firestore Admin)</title>
 
 <!--
-  Gubby House — single-file standalone game with Google sign-in and P2P room (no server).
-  -------------------------------------------------------------------------------
-  IMPORTANT SETUP:
-  1) Replace GOOGLE_CLIENT_ID below with a Google OAuth Web client ID (from Google Cloud Console).
-     - For local testing you can create a credential with origin 'http://localhost' or use actual host.
-     - If you don't want Google login, you can click "Play as Guest".
-  2) Put your sprite files under /sprites/variants/ if you plan to host this file on GitHub Pages.
-     - For local testing: create a "sprites/variants" folder next to this HTML file and add images.
-  3) P2P Multiplayer (no server):
-     - This uses WebRTC but DOES NOT use any external signaling server.
-     - Signaling is manual: the host creates an invite string and shares it with a friend (copy/paste).
-     - The friend pastes that invite into their client, generates an answer string, and sends it back to the host (copy/paste).
-     - Once both sides complete the exchange, a direct P2P data channel is established.
-     - This is the only true way to do serverless signaling reliably from pure client code.
-  4) Security note:
-     - Google sign-in is used only to read the identity token client-side for display. There is no backend.
-     - Do NOT paste any secrets or server private keys into this file.
+  Firestore Rules (paste into Firebase Console -> Firestore -> Rules)
+  -----------------------------------------------------------------
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /users/{userId} {
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow update: if request.auth != null && (
+          (request.auth.uid == userId && !("privileges" in request.resource.data))
+          || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin')
+        );
+      }
+      match /variants/{variantId} {
+        allow read: if true;
+        allow create, update, delete: if request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin';
+      }
+      match /shop/{shopId} {
+        allow read: if true;
+        allow create, update, delete: if request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin';
+      }
+      match /rooms/{roomId} {
+        allow read: if true;
+        allow create, update: if request.auth != null;
+      }
+      match /{document=**} { allow read, write: if false; }
+    }
+  }
+  Notes:
+  - Users doc must be created at /users/{uid} with privileges:'normal' by default.
+  - Admins set 'privileges' to 'admin' via console for admin access.
 -->
 
 <style>
@@ -61,13 +77,14 @@ textarea{min-height:72px; font-family:monospace; white-space:pre-wrap}
 <body>
   <div class="app" id="app">
     <header>
-      <h1>Gubby House — P2P</h1>
+      <h1>Gubby House — P2P + Firestore Admin</h1>
       <div style="margin-left:auto" id="authArea" class="muted small">Not signed in</div>
     </header>
+
     <div class="main">
       <div class="left">
         <div class="house" id="house">
-          <img id="gubbySprite" class="gubby-sprite" src="/sprites/variants/default.png" style="left:50%;top:60%" draggable="false" />
+          <img id="gubbySprite" class="gubby-sprite" src="../sprites/variants/default.png" style="left:50%;top:60%" draggable="false" />
         </div>
 
         <div class="hud">
@@ -123,38 +140,56 @@ textarea{min-height:72px; font-family:monospace; white-space:pre-wrap}
         </div>
 
         <div class="panel admin-panel" id="adminPanel">
-          <label>Admin Panel — Create Variant / Shop Item</label>
+          <label>Admin Panel — Create Variant / Shop Item (Firestore)</label>
           <div style="margin-top:8px">
             <label>Variant ID</label>
             <input type="text" id="variantId" placeholder="e.g. LavaGubby" />
-            <label style="margin-top:6px">File name (inside /sprites/variants/)</label>
+            <label style="margin-top:6px">File name (inside ../sprites/variants/)</label>
             <input type="text" id="variantFile" placeholder="e.g. lava.png" />
             <label style="margin-top:6px">Price (clicks)</label>
             <input type="number" id="variantPrice" value="500" />
             <label style="margin-top:6px">Attributes (json) — e.g. {"clickMultiplier":2,"energyBonus":10}</label>
             <input type="text" id="variantAttrs" placeholder='{"clickMultiplier":2,"energyBonus":10}' />
             <div style="display:flex;gap:8px;margin-top:8px">
-              <button id="createVariantBtn">Create Variant Locally</button>
+              <button id="createVariantBtn">Create Variant in Firestore</button>
               <button id="refreshVariants" class="secondary">Refresh</button>
             </div>
-            <div class="muted small" style="margin-top:8px">Admin-only UI. This local build doesn't connect to Firestore; admin actions are local unless you add backend Firestore later.</div>
+            <div class="muted small" style="margin-top:8px">Admin-only: creating a variant will add a shop upgrade in Firestore. Ensure the file exists under ../sprites/variants/ in your hosted repo.</div>
           </div>
         </div>
 
       </div>
     </div>
-    <footer>Standalone P2P — create invite strings and exchange manually. Host files (sprites) under /sprites/variants/ if you want custom images.</footer>
+    <footer>Standalone P2P + Firestore admin UI. Sprites base path = <code>../sprites/variants/</code></footer>
   </div>
 
-<script>
-/* =================  CONFIG  =================
-   Insert your Google OAuth Client ID here (Web client id)
-   Create one in Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client IDs
-   Allowed origins should include the URL you're hosting this on (or http://localhost for testing).
-*/
-const GOOGLE_CLIENT_ID = 'GOOGLE_CLIENT_ID_HERE'; // <<< REPLACE THIS with your client id
+<!-- Firebase SDKs (compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-/* =============== Game / UI Code ============== */
+<script>
+/* ====== CONFIG ======
+   Make sure this matches your Firebase project.
+   (You provided this earlier; keep it or replace with your own.)
+*/
+const firebaseConfig = {
+  apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
+  authDomain: "gubby-clicker.firebaseapp.com",
+  projectId: "gubby-clicker",
+  storageBucket: "gubby-clicker.firebasestorage.app",
+  messagingSenderId: "255072290621",
+  appId: "1:255072290621:web:9f80676beac50c0059a754",
+  measurementId: "G-R3HFMPH5C4"
+};
+
+/* FIX: sprite base path (relative to page).
+   Use ../sprites/variants/ so hosted path like:
+   https://beston3000.github.io/gubbyclicker/sprites/variants/default.png
+*/
+const SPRITE_BASE_PATH = "../sprites/variants/";
+
+/* ====== App State & UI Helpers ====== */
 function el(id){ return document.getElementById(id); }
 
 const defaultState = {
@@ -166,12 +201,11 @@ const defaultState = {
   upgrades:{clickPower:1, autoClicks:0, multipliers:[]}
 };
 let state = loadState();
-let user = {id:'guest', name:'Guest'};
-let pc = null;         // RTCPeerConnection
-let dc = null;         // DataChannel
-let isHost = false;
-let lastOfferId = null;
+let user = null;
+let db = null;
+let auth = null;
 
+/* UI refs */
 const gubbySprite = el('gubbySprite');
 const hungerVal = el('hungerVal'), thirstVal = el('thirstVal'), energyVal = el('energyVal');
 const feedBtn = el('feedBtn'), waterBtn = el('waterBtn'), colaBtn = el('colaBtn'), playBtn = el('playBtn');
@@ -180,48 +214,124 @@ const adminPanel = el('adminPanel');
 const authArea = el('authArea');
 const accountInfo = el('accountInfo');
 
-el('googleSignIn').addEventListener('click', signInWithGoogle);
-el('guestBtn').addEventListener('click', ()=> { user = {id:'guest_'+randomId(), name:'Guest'}; onSignedIn(); });
-el('feedBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.hunger = Math.min(100,state.hunger+25); syncLocalAndPeers(); });
-el('waterBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.thirst = Math.min(100,state.thirst+25); syncLocalAndPeers(); });
-el('colaBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100,state.energy+50); syncLocalAndPeers(); });
-el('playBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100,state.energy+10); addClicks(5); syncLocalAndPeers(); });
-
-el('showInvite').addEventListener('click', ()=>{ if(pc) { alert('Already initialized — disconnect first'); return; } startHostInvite(); });
-el('pasteInvite').addEventListener('click', ()=>{ const txt = prompt('Paste invite or answer JSON string here'); if(txt) { processInviteString(txt.trim()); }});
-el('processInvite').addEventListener('click', ()=>{ const s = el('inviteIn').value.trim(); if(!s) return alert('Paste invite/answer first'); processInviteString(s); });
-el('disconnectBtn').addEventListener('click', disconnectPeer);
-
-el('createVariantBtn').addEventListener('click', ()=>{ // local-only create
-  const id = el('variantId').value.trim(); const file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0; let attrs={};
-  try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON attrs'); }
-  if(!id || !file) return alert('id & file required');
-  const v = {id, fileName:file, price, attributes:attrs};
-  localVariants.push(v); renderVariantsClientSide(); alert('Variant created locally. To share it with peers, press Sync State to peers.'); syncLocalAndPeers();
-});
-
-el('refreshVariants').addEventListener('click', ()=> renderVariantsClientSide());
-
+/* Local variants fallback */
 let localVariants = [
   {id:'Default', fileName:'default.png', price:0, attributes:{}},
   {id:'Water', fileName:'water.png', price:100, attributes:{clickMultiplier:1.2}},
   {id:'Lava', fileName:'lava.png', price:500, attributes:{clickMultiplier:1.5, energyBonus:10}}
 ];
 
-function applyStateToUI(){
-  hungerVal.textContent = Math.round(state.hunger);
-  thirstVal.textContent = Math.round(state.thirst);
-  energyVal.textContent = Math.round(state.energy);
-  gubbySprite.src = `/sprites/variants/${state.variant}`;
-  authArea.textContent = `User: ${user.name}`;
-  accountInfo.textContent = `ID: ${user.id}`;
+/* Initialize UI */
+applyStateToUI();
+renderShop();
+renderVariantsClientSide();
+
+/* Button wiring */
+el('guestBtn').addEventListener('click', ()=>{ user = {uid:'guest_'+randomId(), displayName:'Guest'}; onSignedIn(); });
+el('googleSignIn').addEventListener('click', ()=>{ if(!auth) initFirebaseAndAuth(); signInWithGoogle(); });
+el('feedBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.hunger = Math.min(100,state.hunger+25); syncLocalAndPeers(); });
+el('waterBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.thirst = Math.min(100,state.thirst+25); syncLocalAndPeers(); });
+el('colaBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100,state.energy+50); syncLocalAndPeers(); });
+el('playBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100,state.energy+10); addClicks(5); syncLocalAndPeers(); });
+
+el('showInvite').addEventListener('click', ()=>{ if(pc) return alert('Already initialized, disconnect first'); startHostInvite(); });
+el('pasteInvite').addEventListener('click', ()=>{ const s=prompt('Paste invite/answer JSON string here'); if(s) processInviteString(s.trim()); });
+el('processInvite').addEventListener('click', ()=>{ const s = el('inviteIn').value.trim(); if(!s) return alert('Paste invite/answer first'); processInviteString(s); });
+el('disconnectBtn').addEventListener('click', disconnectPeer);
+
+el('createVariantBtn').addEventListener('click', async ()=>{
+  if(!db || !user) return alert('Sign-in and enable Firestore to create variants in DB.');
+  const id = el('variantId').value.trim(); const file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0;
+  let attrs={}; try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON in attributes'); }
+  if(!id||!file) return alert('Provide id and file name');
+  // Quick validation: try to HEAD the sprite path (best-effort)
+  try{
+    const res = await fetch(SPRITE_BASE_PATH + file, {method:'HEAD'});
+    if(!res.ok && !confirm('Sprite not found at '+SPRITE_BASE_PATH+file+'. Create anyway?')) return;
+  }catch(e){ if(!confirm('Could not verify sprite file, continue anyway?')) return; }
+  // create firestore docs
+  try{
+    const variantsRef = db.collection('variants');
+    const shopRef = db.collection('shop');
+    await variantsRef.add({ id, fileName:file, price, attributes:attrs, createdBy:user.uid, createdAt: Date.now() });
+    await shopRef.add({ type:'variant', variantFile:file, variantId:id, price, attributes:attrs, createdBy:user.uid, createdAt: Date.now() });
+    alert('Variant and shop item created in Firestore.');
+  }catch(e){ alert('Firestore error: '+e.message); console.error(e); }
+});
+
+/* ====== Firebase init, auth & Firestore interaction ====== */
+function initFirebaseAndAuth(){
+  if(window.firebase && !auth){
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    // auth state observer
+    auth.onAuthStateChanged(async u => {
+      if(u){
+        user = u;
+        // ensure user doc exists
+        try{
+          const userRef = db.collection('users').doc(u.uid);
+          const doc = await userRef.get();
+          if(!doc.exists){
+            await userRef.set({ displayName: u.displayName || u.email.split('@')[0], email: u.email, privileges: 'normal', createdAt: Date.now() });
+          }
+          const profile = (await userRef.get()).data();
+          onSignedIn(profile);
+        }catch(e){ console.error('users doc error', e); onSignedIn(); }
+      } else {
+        user = null;
+        authArea.textContent = 'Not signed in';
+        accountInfo.textContent = '—';
+        adminPanel.classList.remove('visible');
+      }
+    });
+
+    // listen to variants & shop in firestore
+    db.collection('variants').onSnapshot(snap => {
+      const items = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      renderVariantsFromFirestore(items);
+    });
+    db.collection('shop').onSnapshot(snap => {
+      const items = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      renderShopFromFirestore(items);
+    });
+  }
 }
-function saveState(){ localStorage.setItem('gubby_p2p_v1', JSON.stringify(state)); }
-function loadState(){ try{ const raw = localStorage.getItem('gubby_p2p_v1'); if(raw) return JSON.parse(raw); }catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
 
-function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyStateToUI(); }
-function getMultiplier(){ let m=1; if(state.upgrades.multipliers) state.upgrades.multipliers.forEach(v=>m*=v); return m; }
+async function signInWithGoogle(){
+  try{
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+    // onAuthStateChanged will handle post-login
+  }catch(e){ alert('Sign-in failed: '+e.message); }
+}
 
+async function onSignedIn(profile){
+  // user var might be auth user object or guest stub
+  authArea.textContent = `Signed in: ${user.displayName || user.name || user.email || 'User'}`;
+  accountInfo.textContent = user.email ? `Email: ${user.email}` : `ID: ${user.uid}`;
+  // check privileges from /users/{uid} if available
+  if(db && user && user.uid){
+    try{
+      const doc = await db.collection('users').doc(user.uid).get();
+      if(doc.exists){
+        const data = doc.data();
+        if(data.privileges === 'admin'){
+          adminPanel.classList.add('visible');
+        } else adminPanel.classList.remove('visible');
+        accountInfo.textContent += ` — privileges: ${data.privileges || 'normal'}`;
+      } else {
+        accountInfo.textContent += ' — users doc not found (created on signup)';
+      }
+    }catch(e){ console.error('priv check failed', e); }
+  }
+  applyStateToUI();
+  renderShop();
+  renderVariantsClientSide();
+}
+
+/* ======= Shop & Variants rendering ======= */
 function renderShop(){
   shopList.innerHTML = '';
   const builtins = [
@@ -229,52 +339,96 @@ function renderShop(){
     {title:'Auto Clicker', price:500, action:()=>{ if(state.totalClicks < 500) return alert('Not enough clicks'); state.upgrades.autoClicks += 1; state.totalClicks -= 500; syncLocalAndPeers(); }},
     {title:'Multiplier x1.5', price:1500, action:()=>{ if(state.totalClicks < 1500) return alert('Not enough clicks'); state.upgrades.multipliers.push(1.5); state.totalClicks -= 1500; syncLocalAndPeers(); }}
   ];
-  builtins.concat(localVariants).forEach(item => {
+  const all = builtins.concat(localVariants);
+  all.forEach(item=>{
+    const name = item.title || item.id || item.fileName;
+    const price = item.price || item.price || 100;
     const div = document.createElement('div'); div.className='row'; div.style.justifyContent='space-between';
-    const name = item.title || (item.id? item.id : item.fileName);
-    const price = item.price||item.price|| (item.price===0?0: (item.price||100));
     div.innerHTML = `<div><strong>${name}</strong><div class="small">Price: ${price} clicks</div></div><div><button>Buy</button></div>`;
     div.querySelector('button').addEventListener('click', ()=>{
       if(state.totalClicks < price) return alert('Not enough clicks');
       state.totalClicks = Math.max(0, state.totalClicks - price);
-      // apply if variant
       if(item.fileName){ state.variant = item.fileName; if(item.attributes){ if(item.attributes.clickMultiplier) state.upgrades.multipliers.push(item.attributes.clickMultiplier); if(item.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + item.attributes.autoClicks; if(item.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + item.attributes.clickPower; } }
-      if(item.action){ item.action(); }
+      if(item.action) item.action();
       syncLocalAndPeers();
     });
     shopList.appendChild(div);
   });
 }
 
+function renderShopFromFirestore(items){
+  shopList.innerHTML = '';
+  items.forEach(doc=>{
+    const name = doc.type || doc.title || doc.variantId || 'Shop Item';
+    const price = doc.price || 0;
+    const div = document.createElement('div'); div.className='row'; div.style.justifyContent='space-between';
+    div.innerHTML = `<div><strong>${name}</strong><div class="small">Price: ${price}</div></div><div><button>Buy</button></div>`;
+    div.querySelector('button').addEventListener('click', ()=>{
+      if(state.totalClicks < price) return alert('Not enough clicks');
+      state.totalClicks = Math.max(0, state.totalClicks - price);
+      if(doc.type === 'variant'){ state.variant = doc.variantFile; }
+      if(doc.attributes){
+        if(doc.attributes.clickMultiplier) state.upgrades.multipliers.push(doc.attributes.clickMultiplier);
+        if(doc.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + doc.attributes.autoClicks;
+        if(doc.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + doc.attributes.clickPower;
+      }
+      syncLocalAndPeers();
+      alert('Purchased');
+    });
+    shopList.appendChild(div);
+  });
+}
+
 function renderVariantsClientSide(){
-  variantsList.innerHTML = '';
+  variantsList.innerHTML='';
   localVariants.forEach(v => {
-    const pill = document.createElement('div'); pill.className='variant-pill'; pill.textContent = `${v.fileName} ${v.price? '— '+v.price:''}`;
+    const pill = document.createElement('div'); pill.className='variant-pill'; pill.textContent = `${v.fileName}${v.price? ' — '+v.price:''}`;
     pill.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndPeers(); });
     variantsList.appendChild(pill);
   });
 }
 
-// Movement (simple wander)
+function renderVariantsFromFirestore(items){
+  variantsList.innerHTML='';
+  items.forEach(v=>{
+    const pill = document.createElement('div'); pill.className='variant-pill';
+    pill.textContent = `${v.fileName}${v.price? ' — '+v.price:''}`;
+    pill.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndPeers(); });
+    variantsList.appendChild(pill);
+  });
+}
+
+/* ======= State apply/save/load ======= */
+function applyStateToUI(){
+  hungerVal.textContent = Math.round(state.hunger);
+  thirstVal.textContent = Math.round(state.thirst);
+  energyVal.textContent = Math.round(state.energy);
+  gubbySprite.src = SPRITE_BASE_PATH + state.variant;
+  // small top-right info
+  authArea.textContent = user ? (`User: ${user.displayName || user.name || (user.email||user.uid)}`) : 'Not signed in';
+}
+function saveState(){ localStorage.setItem('gubby_full_v1', JSON.stringify(state)); }
+function loadState(){ try{ const raw=localStorage.getItem('gubby_full_v1'); if(raw) return JSON.parse(raw);}catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
+function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyStateToUI(); }
+function getMultiplier(){ let m=1; if(state.upgrades.multipliers) state.upgrades.multipliers.forEach(v=>m*=v); return m; }
+
+/* ======= Movement, decay, autos ======= */
 const houseRect = {w:520,h:420};
-function wander(){ if(!state.alive) return; const margin = 48; const x = Math.random()*(houseRect.w - margin*2) + margin; const y = Math.random()*(houseRect.h - margin*2) + margin; state.pos.x = x; state.pos.y = y; gubbySprite.style.left = x + 'px'; gubbySprite.style.top = y + 'px'; }
+function wander(){ if(!state.alive) return; const margin=48; const x=Math.random()*(houseRect.w-margin*2)+margin; const y=Math.random()*(houseRect.h-margin*2)+margin; state.pos.x=x; state.pos.y=y; gubbySprite.style.left = x+'px'; gubbySprite.style.top = y+'px'; }
 setInterval(wander, 3000);
 
-// decay & autos
-setInterval(()=> {
+setInterval(()=>{
   if(!state.alive) return;
   state.hunger = Math.max(0, state.hunger - 1);
   state.thirst = Math.max(0, state.thirst - 1.2);
   const hour = (new Date()).getHours();
-  if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2);
-  else state.energy = Math.max(0, state.energy - 0.5);
+  if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2); else state.energy = Math.max(0, state.energy - 0.5);
   if(state.hunger===0 || state.thirst===0) state.energy = Math.max(0, state.energy - 2);
-  if(state.energy===0){ state.alive=false; gubbySprite.src='/sprites/variants/dead.png'; }
-  if(state.upgrades.autoClicks>0 && state.alive){ addClicks(state.upgrades.autoClicks); }
-  syncLocalAndPeers(); // keep peers updated
+  if(state.energy===0){ state.alive=false; gubbySprite.src = SPRITE_BASE_PATH + 'dead.png'; }
+  if(state.upgrades.autoClicks>0 && state.alive) addClicks(state.upgrades.autoClicks);
+  syncLocalAndPeers();
 }, 10000);
 
-// click handler
 gubbySprite.addEventListener('click', ()=>{
   if(!state.alive) return;
   const power = state.upgrades.clickPower * getMultiplier();
@@ -285,159 +439,54 @@ gubbySprite.addEventListener('click', ()=>{
   syncLocalAndPeers();
 });
 
-/* ============ Simple Google Sign-in (client-side) =============
-   Uses Google Identity Services (GSI) popup to get an ID token.
-   You MUST set GOOGLE_CLIENT_ID above.
-   This flow is purely client-side and reads user.name/email from the ID token payload.
-   No backend is used.
-*/
-function loadGoogleLibraryAndAttach(){
-  // load the GSI library script dynamically and then configure popup behavior
-  if(!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('GOOGLE_CLIENT_ID')) {
-    el('googleSignIn').textContent = 'Sign in with Google (set client id)';
-    return;
-  }
-  const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.defer = true;
-  s.onload = ()=> {
-    // use the popup credential flow on click
-    el('googleSignIn').addEventListener('click', ()=> {
-      /* global google */ // for linter
-      google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGsiCredential
-      });
-      google.accounts.id.prompt(); // may show One Tap — we prefer popup.
-      // fallback: use popup credential via google.accounts.id.prompt (works in many cases).
-    });
-  };
-  document.head.appendChild(s);
-}
-function handleGsiCredential(resp){
-  // resp.credential is a JWT id_token; decode payload (base64)
-  const payload = parseJwt(resp.credential);
-  user = {id: payload.sub, name: payload.name || payload.email || 'GoogleUser', email: payload.email};
-  onSignedIn();
-}
-function signInWithGoogle(){
-  if(!window.google){
-    // GSI not yet loaded — attempt to load and then open sign-in
-    loadGoogleLibraryAndAttach();
-    alert('Google library loaded — click Sign in with Google again to open the prompt.');
-    return;
-  }
-  // If library loaded, call initialize+prompt
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGsiCredential });
-  google.accounts.id.prompt();
-}
-function parseJwt (token) {
-  try{
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-    return JSON.parse(jsonPayload);
-  }catch(e){ return {}; }
-}
-function onSignedIn(){
-  applyStateToUI();
-  renderShop();
-  renderVariantsClientSide();
-  // update UI
-  authArea.textContent = `Signed in: ${user.name}`;
-  accountInfo.textContent = `ID: ${user.id} ${user.email? ' — '+user.email:''}`;
-  // Show admin UI if user id contains 'admin' (example local toggle)
-  if(user.email && user.email.endsWith('@youradmin.com')) adminPanel.classList.add('visible'); // change to desired rule
-}
+/* ======= P2P (manual WebRTC signaling) ======= */
+let pc = null, dc = null, isHost = false, lastOfferId = null;
 
-/* ================= P2P (WebRTC manual signaling) ===================
-   This implements a serverless manual signaling flow:
-   - Host: startHostInvite() -> creates RTCPeerConnection + DataChannel -> createOffer -> shows invite JSON in inviteOut.
-            Send that invite string to friend (e.g., chat)
-   - Guest: paste that invite into inviteIn and press ProcessInvite -> sets remote desc with offer, creates answer -> answer string appears in inviteOut.
-            Send answer string back to host.
-   - Host: paste guest answer into inviteIn and press ProcessInvite -> sets remote desc (answer) -> connection establishes.
-   Messages exchanged across datachannel synchronize game state.
-*/
-function randomId(){ return Math.random().toString(36).slice(2,9); }
 function startHostInvite(){
-  isHost = true;
-  lastOfferId = randomId();
-  preparePeerConnection();
-  // create data channel for game messages
-  dc = pc.createDataChannel('gubby');
-  setupDataChannel(dc);
+  isHost = true; lastOfferId = randomId(); preparePeerConnection();
+  dc = pc.createDataChannel('gubby'); setupDataChannel(dc);
   pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(()=> {
-    // wait for localDescription to be set (should be immediate)
-    const invite = { type:'offer', sdp: pc.localDescription.sdp, id: lastOfferId, from: user.id, name:user.name };
+    // once setLocalDescription available, produce invite
+    const invite = { type:'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from: user?.uid || 'guest', name: user?.displayName || 'Guest' };
     el('inviteOut').value = btoa(JSON.stringify(invite));
-    alert('Invite created. Copy the invite string and send to friend. When friend sends back answer, paste it into the right box and click Process Invite.');
+    alert('Invite created; copy the invite string and send to your friend.');
   }).catch(err=>{ console.error(err); alert('Offer failed: '+err.message); });
 }
 
 function preparePeerConnection(){
-  const config = {iceServers: [{urls:['stun:stun.l.google.com:19302']}]}; // STUN only
+  const config = { iceServers: [{urls:['stun:stun.l.google.com:19302']}] };
   pc = new RTCPeerConnection(config);
-  pc.onicecandidate = (ev)=> {
-    // Normally you'd send ICE candidates to the remote side; with manual SDP exchange we rely on trickle-less behavior,
-    // but ICE candidates may still be emitted. We append them into inviteOut when complete.
-    // This implementation will gather candidates into the inviteOut after ICE gathering finishes.
-    // Monitor when ICE gathering state complete:
+  pc.onicecandidate = ()=> {
     if(pc.iceGatheringState === 'complete'){
-      // append ICE candidates into localDescription and update inviteOut
-      const full = { type: 'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from:user.id, name:user.name };
+      const full = { type:'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from:user?.uid || 'guest', name:user?.displayName || 'Guest' };
       el('inviteOut').value = btoa(JSON.stringify(full));
     }
   };
-  pc.ondatachannel = (ev)=> {
-    dc = ev.channel;
-    setupDataChannel(dc);
-  };
+  pc.ondatachannel = (ev)=> { dc = ev.channel; setupDataChannel(dc); };
   pc.onconnectionstatechange = ()=> {
-    if(pc.connectionState === 'connected'){
-      console.log('Peer connected!');
-      showStatus('Peer connected');
-      // after connection, send local full state to peer
-      sendMessage({t:'stateSync', state});
-    }
+    if(pc.connectionState === 'connected'){ showStatus('Peer connected'); sendMessage({t:'stateSync', state}); }
   };
 }
 
 function setupDataChannel(channel){
-  channel.onopen = ()=> { console.log('Data channel open'); showStatus('Data channel open'); };
-  channel.onmessage = (ev)=> {
-    try{
-      const msg = JSON.parse(ev.data);
-      handlePeerMessage(msg);
-    }catch(e){ console.log('Received raw:', ev.data); }
-  };
-  channel.onclose = ()=> { showStatus('Data channel closed'); };
+  channel.onopen = ()=> showStatus('Data channel open');
+  channel.onmessage = (ev)=> { try{ const msg = JSON.parse(ev.data); handlePeerMessage(msg); }catch(e){ console.log('raw', ev.data); } };
+  channel.onclose = ()=> showStatus('Data channel closed');
 }
 
 function handlePeerMessage(msg){
-  if(msg.t === 'ping'){ sendMessage({t:'pong'}); return; }
-  if(msg.t === 'stateSync'){ // remote provided a full state -> merge conservatively
-    mergeRemoteState(msg.state);
-    return;
-  }
-  if(msg.t === 'action'){ // apply a small action (click/feed)
-    applyRemoteAction(msg.action);
-    return;
-  }
-  if(msg.t === 'chat'){ console.log('chat>', msg.text); }
+  if(msg.t==='stateSync') mergeRemoteState(msg.state);
+  if(msg.t==='action') applyRemoteAction(msg.action);
+  if(msg.t==='ping') sendMessage({t:'pong'});
 }
 
 function mergeRemoteState(remote){
-  // Keep these fields authoritative: choose highest totalClicks, latest energy/hunger by timestamp if present
   if(!remote) return;
-  // naive: apply remote state to local (you may implement merges)
-  // We'll prefer a straightforward approach: if remote.totalClicks > local, copy their upgrades/variant etc.
   if(remote.totalClicks > state.totalClicks){
     state.totalClicks = remote.totalClicks;
     state.upgrades = remote.upgrades || state.upgrades;
     state.variant = remote.variant || state.variant;
   }
-  // Update vital bars (average them)
   state.hunger = Math.max(0, Math.min(100, Math.round((state.hunger + (remote.hunger||state.hunger))/2)));
   state.thirst = Math.max(0, Math.min(100, Math.round((state.thirst + (remote.thirst||state.thirst))/2)));
   state.energy = Math.max(0, Math.min(100, Math.round((state.energy + (remote.energy||state.energy))/2)));
@@ -446,95 +495,46 @@ function mergeRemoteState(remote){
 
 function applyRemoteAction(action){
   if(!action) return;
-  if(action.type === 'click'){ addClicks(action.value||1); }
-  if(action.type === 'feed'){ state.hunger = Math.min(100, state.hunger + (action.value||20)); }
-  if(action.type === 'water'){ state.thirst = Math.min(100, state.thirst + (action.value||20)); }
-  if(action.type === 'cola'){ state.energy = Math.min(100, state.energy + (action.value||40)); }
+  if(action.type==='click') addClicks(action.value||1);
+  if(action.type==='feed') state.hunger = Math.min(100, state.hunger + (action.value||20));
+  if(action.type==='water') state.thirst = Math.min(100, state.thirst + (action.value||20));
+  if(action.type==='cola') state.energy = Math.min(100, state.energy + (action.value||40));
   saveState(); applyStateToUI();
 }
 
-/* Process an invite/answer string pasted by the other peer.
-   Invite string is base64(JSON) produced by btoa(JSON.stringify(inviteObj))
-   inviteObj: { type:'offer'|'answer', sdp:..., id:..., from:..., name:... }
-*/
 async function processInviteString(b64str){
   let obj=null;
-  try{ obj = JSON.parse(atob(b64str)); }catch(e){ return alert('Invalid invite format'); }
-  if(obj.type === 'offer'){
-    // we are the answerer (guest)
-    isHost = false;
-    lastOfferId = obj.id;
-    preparePeerConnection();
-    const desc = { type:'offer', sdp: obj.sdp };
-    await pc.setRemoteDescription(desc);
-    // create answer
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    // when localDescription populated, output the answer for the host to paste back
-    const answerObj = { type:'answer', sdp: pc.localDescription.sdp, id: obj.id, from:user.id, name:user.name };
+  try{ obj=JSON.parse(atob(b64str)); }catch(e){ return alert('Invalid invite format'); }
+  if(obj.type==='offer'){
+    isHost=false; lastOfferId = obj.id; preparePeerConnection();
+    await pc.setRemoteDescription({type:'offer', sdp: obj.sdp});
+    const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+    const answerObj = { type:'answer', sdp: pc.localDescription.sdp, id: obj.id, from: user?.uid || 'guest', name: user?.displayName || 'Guest' };
     el('inviteOut').value = btoa(JSON.stringify(answerObj));
-    alert('Answer created. Copy this answer and send it back to the host. When host pastes it, press Process Invite to finalize.');
-  } else if(obj.type === 'answer'){
-    // we are the host receiving an answer
-    if(!pc){ alert('No offer present on this client. Host must create an invite first.'); return; }
-    const desc = { type:'answer', sdp: obj.sdp };
-    await pc.setRemoteDescription(desc);
-    alert('Answer processed — connection should establish shortly (if NAT permits).');
-  } else {
-    alert('Unknown invite type: '+obj.type);
-  }
+    alert('Answer created; send this answer back to the host.');
+  } else if(obj.type==='answer'){
+    if(!pc) return alert('No offer exists here — host must create invite first.');
+    await pc.setRemoteDescription({type:'answer', sdp: obj.sdp});
+    alert('Answer processed; connection should establish if NAT permits.');
+  } else alert('Unknown invite type: '+obj.type);
 }
 
-/* Send a message to peer via datachannel */
-function sendMessage(msg){
-  if(dc && dc.readyState === 'open'){ dc.send(JSON.stringify(msg)); }
-}
+function sendMessage(msg){ if(dc && dc.readyState==='open') dc.send(JSON.stringify(msg)); }
+function syncLocalAndPeers(){ saveState(); applyStateToUI(); if(dc && dc.readyState==='open') sendMessage({t:'stateSync', state}); }
+function disconnectPeer(){ try{ if(dc) dc.close(); }catch(e){} try{ if(pc) pc.close(); }catch(e){} pc=null; dc=null; isHost=false; lastOfferId=null; el('inviteOut').value=''; el('inviteIn').value=''; showStatus('Disconnected'); }
+function showStatus(msg){ console.log('[status]', msg); accountInfo.textContent = user ? (user.displayName||user.email||user.uid) + ' — ' + msg : 'guest — '+msg; }
 
-/* Sync local state to peers (send full state) */
-function syncLocalAndPeers(){
-  saveState(); applyStateToUI();
-  if(dc && dc.readyState === 'open'){ sendMessage({t:'stateSync', state}); }
-}
-
-/* Disconnect and cleanup */
-function disconnectPeer(){
-  try{ if(dc) dc.close(); }catch(e){}
-  try{ if(pc) pc.close(); }catch(e){}
-  dc = null; pc = null; isHost = false; lastOfferId = null;
-  el('inviteOut').value = ''; el('inviteIn').value = '';
-  showStatus('Disconnected');
-}
-
-/* Show ephemeral status in console+UI */
-function showStatus(msg){
-  console.log('[status]', msg);
-  accountInfo.textContent = (user? user.name : 'guest') + ' — ' + msg;
-}
-
-/* Utility: apply local state and initial render */
-if(!state) state = JSON.parse(JSON.stringify(defaultState));
-applyStateToUI();
-renderShop();
-renderVariantsClientSide();
-
-/* small helpers */
+/* ======= Utilities ======= */
 function randomId(){ return Math.random().toString(36).slice(2,9); }
 
-/* Expose a simple API for local testing (dev console) */
-window.gubbyP2P = {
-  state, saveState, loadState, disconnectPeer, startHostInvite, processInviteString
-};
+/* Expose for debugging */
+window.gubbyGame = { state, saveState, loadState, syncLocalAndPeers, startHostInvite, processInviteString, disconnectPeer };
 
-/* Attempt to load Google library automatically for convenience */
-(function autoLoadGSI(){
-  if(GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('GOOGLE_CLIENT_ID')){
-    const s = document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true; s.defer=true;
-    s.onload = ()=> console.log('GSI loaded. Use Sign in with Google button.');
-    document.head.appendChild(s);
-  } else {
-    el('googleSignIn').textContent = 'Sign in with Google (set client id)';
-  }
+/* Initialize Firebase only when needed so offline guests still work */
+(function tryAutoInit(){
+  // if user hits Sign in with Google, initFirebaseAndAuth() will be called
 })();
+
 </script>
 </body>
 </html>
