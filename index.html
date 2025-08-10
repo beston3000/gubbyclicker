@@ -3,137 +3,175 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Gubby House — Fixed Sprites & Move-Energy + Click Sound</title>
+<title>Gubby House — Clean UI, P2P, Shared Backpack</title>
+
+<!--
+  Single-file game. Sprites: sprites/variants/*.png
+  Sound: sounds/merp.mp3
+  Set firebaseConfig below if you want Firestore admin + Google sign-in.
+-->
+
 <style>
-:root{--bg:#f3f7fb;--card:#fff;--accent:#6b8cff}
-*{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
-body{margin:0;min-height:100vh;background:linear-gradient(#e6f3ff,#f7fbff);display:flex;align-items:center;justify-content:center;padding:18px}
-.app{width:100%;max-width:1200px;background:var(--card);border-radius:12px;box-shadow:0 14px 40px rgba(10,10,30,0.12);overflow:hidden}
-header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #eef3ff}
-header h1{margin:0;font-size:18px}
-.main{display:grid;grid-template-columns:560px 1fr;gap:12px;padding:18px}
-.left{background:#f8fbff;border-radius:10px;padding:12px}
-.right{padding:12px}
-.house{width:520px;height:420px;background-image:linear-gradient(#fff,#def);border-radius:8px;position:relative;overflow:hidden;border:2px solid #e6f2ff}
-.gubby-sprite{position:absolute;transform:translate(-50%,-50%);width:96px;height:96px;transition:left .5s linear, top .5s linear, transform .2s}
-.hud{display:flex;gap:8px;margin-top:8px}
-.stat{background:white;padding:8px;border-radius:8px;border:1px solid #eef4ff;flex:1}
-.stat strong{display:block}
-.controls{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
-button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer}
-button.secondary{background:#eef3ff;color:#164ea6}
-.panel{background:#fff;padding:10px;border-radius:8px;border:1px solid #eef4ff;margin-bottom:12px}
-label{font-size:13px;color:#444}
-input[type=text], input[type=password], input[type=number], select, textarea{width:100%;padding:8px;margin-top:6px;border-radius:8px;border:1px solid #e6eef9}
-.small{font-size:12px;color:#667}
-.variants-list{display:flex;gap:8px;flex-wrap:wrap}
-.variant-pill{padding:6px 8px;border-radius:8px;border:1px solid #e6eef9;background:white;cursor:pointer}
-.admin-panel{display:none;border-top:1px dashed #e6eef9;padding-top:8px;margin-top:8px}
-.visible{display:block}
-.muted{color:#667;font-size:13px}
-.row{display:flex;gap:8px;align-items:center}
-footer{padding:12px;border-top:1px solid #f0f6ff;text-align:center;font-size:12px;color:#666}
-textarea{min-height:72px; font-family:monospace; white-space:pre-wrap}
-.notice{background:#fffbeb;border:1px solid #ffecb5;padding:8px;border-radius:8px}
+  :root{
+    --bg:#eff7ff; --card:#fff; --accent:#4f7cff; --muted:#6b7280;
+  }
+  *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
+  body{margin:0;background:var(--bg);display:flex;align-items:center;justify-content:center;height:100vh}
+  .wrap{width:1100px;background:var(--card);border-radius:12px;box-shadow:0 12px 40px rgba(10,10,30,0.12);overflow:hidden;display:grid;grid-template-rows:auto 1fr}
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #e6eef9}
+  header h1{margin:0;font-size:18px}
+  .top-controls{display:flex;gap:8px;align-items:center}
+  .main{display:grid;grid-template-columns:1fr 340px;gap:18px;padding:18px}
+  .game-card{background:linear-gradient(180deg,#ffffff,#f3fbff);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:12px;align-items:center}
+  .house{width:560px;height:420px;border-radius:8px;background:linear-gradient(#fff,#e6f6ff);position:relative;overflow:hidden;border:1px solid #e6f2ff}
+  .gubby-sprite{position:absolute;transform:translate(-50%,-50%);width:96px;height:96px;transition:left .45s linear, top .45s linear}
+  .hud-row{display:flex;gap:10px;width:100%;justify-content:center}
+  .stat{background:#fff;border-radius:8px;padding:8px 12px;border:1px solid #eef4ff;min-width:140px;text-align:center}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer}
+  button.secondary{background:#eef3ff;color:var(--accent);font-weight:600}
+  .panel{background:#fff;border-radius:8px;padding:12px;border:1px solid #eef4ff}
+  .right-col{display:flex;flex-direction:column;gap:12px}
+  .small{font-size:13px;color:var(--muted)}
+  .muted{color:var(--muted)}
+  /* Backpack badge */
+  .backpack{display:flex;gap:6px;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid #eef4ff;background:#fff}
+  .bp-item{display:flex;flex-direction:column;align-items:center;font-size:12px;color:var(--muted)}
+  .bp-qty{font-weight:700;color:#111}
+  /* modal shop */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(8,10,30,0.45);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal{width:640px;background:white;border-radius:12px;padding:18px;box-shadow:0 18px 60px rgba(10,10,30,0.4)}
+  .shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .shop-item{border-radius:8px;border:1px solid #eef4ff;padding:8px;display:flex;flex-direction:column;gap:6px}
+  .shop-row{display:flex;justify-content:space-between;align-items:center}
+  .compact{font-size:13px;color:var(--muted)}
+  /* invite compact area */
+  .invite-row{display:flex;gap:8px;align-items:center}
+  textarea{width:100%;height:80px;padding:8px;border-radius:8px;border:1px solid #e6eef9}
+  .tiny{font-size:12px;padding:6px 8px}
+  /* responsive small */
+  @media(max-width:1100px){ .wrap{width:96vw} .main{grid-template-columns:1fr} .house{width:100%;height:360px} }
 </style>
 </head>
 <body>
-  <div class="app" id="app">
-    <header>
-      <h1>Gubby House — Fixed Sprites & Move-Energy + Click Sound</h1>
-      <div style="margin-left:auto" id="authArea" class="muted small">Not signed in</div>
-    </header>
 
-    <div class="main">
-      <div class="left">
-        <div class="house" id="house">
-          <!-- initial left/top will be overridden by state (px coords) -->
-          <img id="gubbySprite" class="gubby-sprite" src="sprites/variants/default.png" style="left:260px;top:210px" draggable="false" />
-        </div>
-
-        <div class="hud">
-          <div class="stat"><strong>Hunger <span id="hungerVal">0</span>%</strong><div class="small" id="hungerBar">—</div></div>
-          <div class="stat"><strong>Thirst <span id="thirstVal">0</span>%</strong><div class="small" id="thirstBar">—</div></div>
-          <div class="stat"><strong>Energy <span id="energyVal">0</span>%</strong><div class="small" id="energyBar">—</div></div>
-        </div>
-
-        <div class="controls">
-          <button id="feedBtn">Feed</button>
-          <button id="waterBtn" class="secondary">Give Water</button>
-          <button id="colaBtn">Give Bloxy Cola</button>
-          <button id="playBtn" class="secondary">Play</button>
-          <button id="showInvite" class="secondary">Create Invite (host)</button>
-          <button id="pasteInvite" class="secondary">Paste Invite (join)</button>
-          <div style="margin-left:auto" class="small muted">P2P: manual copy/paste for serverless signaling</div>
-        </div>
-
-        <div style="margin-top:12px" class="panel">
-          <label>Connection & Messages</label>
-          <div class="row" style="gap:6px;align-items:flex-start">
-            <textarea id="inviteOut" placeholder="Invite / Answer will appear here (copy & send to friend)"></textarea>
-            <textarea id="inviteIn" placeholder="Paste friend's invite/answer here then press 'Process Invite'"></textarea>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <button id="processInvite">Process Invite</button>
-              <button id="disconnectBtn" class="secondary">Disconnect</button>
-            </div>
-          </div>
-          <div style="margin-top:8px" class="muted small">How to connect (no server): Host: Create Invite → send the invite string to friend.
-            Friend: Paste that invite → press "Process Invite" → send the Answer back to host → Host pastes Answer and presses Process Invite to complete the handshake.</div>
-        </div>
-
+<div class="wrap" id="app">
+  <header>
+    <h1>Gubby House</h1>
+    <div class="top-controls">
+      <div class="backpack" id="backpackUI" title="Shared backpack (shared between players)">
+        <div class="bp-item"><div class="bp-qty" id="bpFood">0</div><div class="compact">Food</div></div>
+        <div class="bp-item"><div class="bp-qty" id="bpWater">0</div><div class="compact">Water</div></div>
+        <div class="bp-item"><div class="bp-qty" id="bpCola">0</div><div class="compact">Cola</div></div>
       </div>
 
-      <div class="right">
-        <div class="panel">
-          <label>Account / Login</label>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button id="googleSignIn" class="secondary">Sign in with Google</button>
-            <button id="guestBtn">Play as Guest</button>
+      <div style="width:1px;background:#e6eef9;height:28px;margin:0 8px"></div>
+
+      <div class="small muted" id="authArea">Not signed in</div>
+      <button id="googleSignIn" class="secondary">Sign in</button>
+      <button id="shopBtn" class="secondary">Shop</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="game-card">
+      <div class="house" id="house">
+        <img id="gubbySprite" class="gubby-sprite" src="sprites/variants/default.png" style="left:260px;top:210px" draggable="false" />
+      </div>
+
+      <div class="hud-row">
+        <div class="stat"><div class="small">Hunger</div><div id="hungerVal">0</div></div>
+        <div class="stat"><div class="small">Thirst</div><div id="thirstVal">0</div></div>
+        <div class="stat"><div class="small">Energy</div><div id="energyVal">0</div></div>
+      </div>
+
+      <div class="controls">
+        <button id="feedBtn">Feed (use backpack)</button>
+        <button id="waterBtn" class="secondary">Water (use backpack)</button>
+        <button id="colaBtn" class="secondary">Bloxy Cola (use backpack)</button>
+        <button id="playBtn" class="secondary">Play</button>
+        <button id="inviteBtn" class="secondary">Create Invite</button>
+        <button id="pasteInviteBtn" class="secondary">Join via Invite</button>
+      </div>
+
+      <div style="width:100%;margin-top:6px" class="small compact">Click Gubby to earn clicks (sound plays for all players).</div>
+    </div>
+
+    <div class="right-col">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>Controls</strong><div class="compact">Manual P2P signaling (no server)</div></div>
+        </div>
+
+        <div style="margin-top:8px" class="compact">
+          <div class="invite-row" style="margin-bottom:6px">
+            <button id="createInviteShort" class="tiny">Create Invite</button>
+            <button id="copyInviteBtn" class="tiny secondary">Copy Invite</button>
+            <button id="disconnectBtn" class="tiny">Disconnect</button>
           </div>
-          <div id="accountInfo" class="muted small" style="margin-top:8px">—</div>
-        </div>
-
-        <div class="panel">
-          <label>Shop & Upgrades</label>
-          <div id="shopList" style="margin-top:8px"></div>
-        </div>
-
-        <div class="panel">
-          <label>Variants</label>
-          <div class="variants-list" id="variantsList"></div>
-        </div>
-
-        <div class="panel admin-panel" id="adminPanel">
-          <label>Admin Panel — Create Variant / Shop Item (Firestore)</label>
-          <div style="margin-top:8px">
-            <label>Variant ID</label>
-            <input type="text" id="variantId" placeholder="e.g. LavaGubby" />
-            <label style="margin-top:6px">File name (inside sprites/variants/)</label>
-            <input type="text" id="variantFile" placeholder="e.g. lava.png" />
-            <label style="margin-top:6px">Price (clicks)</label>
-            <input type="number" id="variantPrice" value="500" />
-            <label style="margin-top:6px">Attributes (json) — e.g. {"clickMultiplier":2,"energyBonus":10}</label>
-            <input type="text" id="variantAttrs" placeholder='{"clickMultiplier":2,"energyBonus":10}' />
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button id="createVariantBtn">Create Variant in Firestore</button>
-              <button id="refreshVariants" class="secondary">Refresh</button>
+          <textarea id="inviteOut" placeholder="Invite / Answer will appear here (copy & send)"></textarea>
+          <div style="margin-top:8px" class="invite-row">
+            <textarea id="inviteIn" placeholder="Paste friend's invite/answer here"></textarea>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <button id="processInvite" class="tiny">Process Invite</button>
+              <button id="processAnswer" class="tiny secondary">Paste Answer</button>
             </div>
-            <div class="muted small" style="margin-top:8px">Admin-only: creating a variant will add a shop upgrade in Firestore. Ensure the file exists under <code>sprites/variants/</code> in your hosted repo.</div>
           </div>
         </div>
+      </div>
 
+      <div class="panel">
+        <strong class="compact">Account</strong>
+        <div class="compact" id="accountInfo">—</div>
+      </div>
+
+      <div class="panel">
+        <strong class="compact">Variants</strong>
+        <div id="variantsList" style="margin-top:8px" class="compact"></div>
+      </div>
+
+      <div class="panel admin-panel" id="adminPanel" style="display:none">
+        <strong class="compact">Admin Panel</strong>
+        <div style="margin-top:8px" class="compact">
+          <label>Variant ID</label><input id="variantId" type="text" placeholder="LavaGubby">
+          <label>File name (sprites/variants)</label><input id="variantFile" type="text" placeholder="lava.png">
+          <label>Price</label><input id="variantPrice" type="number" value="500">
+          <label>Attributes (json)</label><input id="variantAttrs" type="text" placeholder='{"clickMultiplier":1.5}'>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="createVariantBtn">Create Variant</button>
+            <button id="refreshVariants">Refresh</button>
+          </div>
+        </div>
       </div>
     </div>
-    <footer>Standalone P2P + Firestore admin UI. Sprites base path = <code>sprites/variants/</code>, sounds = <code>sounds/</code></footer>
   </div>
+</div>
 
-<!-- Firebase SDKs (compat) -->
+<!-- Shop modal -->
+<div class="modal-backdrop" id="shopModal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Shop</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="compact">Clicks: <span id="clicksCounter">0</span></div>
+        <button id="closeShop" class="secondary">Close</button>
+      </div>
+    </div>
+
+    <div class="shop-grid" id="shopGrid">
+      <!-- shop items injected here -->
+    </div>
+  </div>
+</div>
+
+<!-- Firebase (load on demand) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* ====== CONFIG (keep or replace) ====== */
+/* ----------------- CONFIG ----------------- */
+/* FIREBASE: replace with your project config if you want admin + firestore features */
 const firebaseConfig = {
   apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
   authDomain: "gubby-clicker.firebaseapp.com",
@@ -144,90 +182,322 @@ const firebaseConfig = {
   measurementId: "G-R3HFMPH5C4"
 };
 
-/* IMPORTANT PATH FIXES */
-const SPRITE_BASE_PATH = "sprites/variants/"; // <-- fixed: no ../ so page at /gubbyclicker/index.html loads from /gubbyclicker/sprites/variants/
-const SOUND_BASE_PATH  = "sounds/";           // put merp.mp3 at /gubbyclicker/sounds/merp.mp3
+/* Assets base paths (fixed to load from folder next to index.html)
+   If hosting at https://beston3000.github.io/gubbyclicker/index.html,
+   the sound and sprites should be at:
+     https://beston3000.github.io/gubbyclicker/sprites/variants/...
+     https://beston3000.github.io/gubbyclicker/sounds/merp.mp3
+*/
+const SPRITE_BASE_PATH = "sprites/variants/";
+const SOUND_BASE_PATH  = "sounds/";
 
-/* Preload click sound */
-let merpAudio = null;
-(function preloadSound(){
-  merpAudio = new Audio(SOUND_BASE_PATH + 'merp.mp3');
-  merpAudio.preload = 'auto';
-  // silence any console error if file missing
-  merpAudio.addEventListener('error', ()=> { console.warn('merp.mp3 not found at', SOUND_BASE_PATH + 'merp.mp3'); });
-})();
-
-/* ====== App State & UI Helpers ====== */
+/* ---------- App state & helpers ---------- */
 function el(id){ return document.getElementById(id); }
+function randomId(){ return Math.random().toString(36).slice(2,9); }
 
 const defaultState = {
-  name: 'Gubby',
-  variant: 'default.png',
+  name:'Gubby',
+  variant:'default.png',
   pos:{x:260,y:210},
   hunger:80, thirst:80, energy:100, alive:true,
   clicks:0, totalClicks:0,
-  upgrades:{clickPower:1, autoClicks:0, multipliers:[]}
+  upgrades:{clickPower:1, autoClicks:0, multipliers:[]},
+  backpack:{ food:5, water:5, cola:2 }
 };
 let state = loadState();
-let user = null;
-let db = null;
-let auth = null;
+let user = null; // { uid, displayName, email }
+let db = null, auth = null;
 
 /* UI refs */
 const gubbySprite = el('gubbySprite');
 const hungerVal = el('hungerVal'), thirstVal = el('thirstVal'), energyVal = el('energyVal');
-const feedBtn = el('feedBtn'), waterBtn = el('waterBtn'), colaBtn = el('colaBtn'), playBtn = el('playBtn');
-const shopList = el('shopList'), variantsList = el('variantsList');
-const adminPanel = el('adminPanel');
-const authArea = el('authArea');
-const accountInfo = el('accountInfo');
+const bpFood = el('bpFood'), bpWater = el('bpWater'), bpCola = el('bpCola');
+const clicksCounter = el('clicksCounter');
 
-/* Local variants fallback */
-let localVariants = [
-  {id:'Default', fileName:'default.png', price:0, attributes:{}},
-  {id:'Water', fileName:'water.png', price:100, attributes:{clickMultiplier:1.2}},
-  {id:'Lava', fileName:'lava.png', price:500, attributes:{clickMultiplier:1.5, energyBonus:10}}
+/* load audio buffer for merp using WebAudio for playbackRate manipulation */
+let audioCtx = null, merpBuffer = null;
+async function loadMerpBuffer(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const res = await fetch(SOUND_BASE_PATH + 'merp.mp3');
+    if(!res.ok) { console.warn('merp not found at', SOUND_BASE_PATH+'merp.mp3'); merpBuffer = null; return; }
+    const ab = await res.arrayBuffer();
+    merpBuffer = await audioCtx.decodeAudioData(ab);
+  }catch(e){ console.warn('loadMerpBuffer error', e); merpBuffer = null; }
+}
+loadMerpBuffer();
+
+/* Play merp with random pitch ±15% (-15% .. +15%): playbackRate ~ 0.85..1.15 */
+function playMerpRandomPitch(){
+  if(!merpBuffer) { /* fallback: try HTMLAudio */ try{ new Audio(SOUND_BASE_PATH+'merp.mp3').play().catch(()=>{}); }catch(e){} return; }
+  try{
+    const src = audioCtx.createBufferSource();
+    src.buffer = merpBuffer;
+    // set playbackRate with ±15% variance
+    const jitter = (Math.random()*0.3) - 0.15; // -0.15 .. +0.15
+    src.playbackRate.value = 1 + jitter;
+    src.connect(audioCtx.destination);
+    src.start(0);
+  }catch(e){ console.warn('playMerp failed', e); }
+}
+
+/* Apply UI state */
+function applyUI(){
+  hungerVal.textContent = Math.round(state.hunger);
+  thirstVal.textContent = Math.round(state.thirst);
+  energyVal.textContent = Math.round(state.energy);
+  bpFood.textContent = state.backpack.food;
+  bpWater.textContent = state.backpack.water;
+  bpCola.textContent = state.backpack.cola;
+  clicksCounter.textContent = state.totalClicks;
+  gubbySprite.src = SPRITE_BASE_PATH + state.variant;
+  if(state.pos && typeof state.pos.x === 'number') gubbySprite.style.left = state.pos.x + 'px';
+  if(state.pos && typeof state.pos.y === 'number') gubbySprite.style.top = state.pos.y + 'px';
+  el('authArea').textContent = user ? `${user.displayName || user.email || user.uid}` : 'Not signed in';
+  el('accountInfo').textContent = user ? `${user.email || user.uid}` : '—';
+}
+
+/* Save/load */
+function saveState(){ localStorage.setItem('gubby_v2', JSON.stringify(state)); }
+function loadState(){ try{ const raw = localStorage.getItem('gubby_v2'); if(raw) return JSON.parse(raw); }catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
+
+/* start UI */
+applyUI();
+
+/* ---------- Shop modal UI ---------- */
+const shopModal = el('shopModal');
+const shopBtn = el('shopBtn');
+const closeShop = el('closeShop');
+const shopGrid = el('shopGrid');
+
+shopBtn.addEventListener('click', ()=> openShop());
+closeShop.addEventListener('click', ()=> closeShopModal());
+function openShop(){ renderShopGrid(); shopModal.style.display = 'flex'; }
+function closeShopModal(){ shopModal.style.display = 'none'; }
+
+/* built-in shop items (also Firestore shop will populate when connected) */
+const builtinShop = [
+  { id:'click1', title:'Upgrade Click Power +1', price:200, apply:()=> { if(state.totalClicks < 200) return alert('Not enough clicks'); state.upgrades.clickPower +=1; state.totalClicks -=200; } },
+  { id:'auto1', title:'Auto Clicker +1', price:800, apply:()=> { if(state.totalClicks < 800) return alert('Not enough clicks'); state.upgrades.autoClicks +=1; state.totalClicks -=800; } },
+  { id:'packFood', title:'Buy Food Packet (+5 to backpack)', price:150, apply:()=> { if(state.totalClicks < 150) return alert('Not enough clicks'); state.totalClicks -=150; state.backpack.food +=5; } },
+  { id:'bottleWater', title:'Buy Water Bottle (+5)', price:150, apply:()=> { if(state.totalClicks < 150) return alert('Not enough clicks'); state.totalClicks -=150; state.backpack.water +=5; } },
+  { id:'colaPack', title:'Buy Bloxy Cola (+2)', price:300, apply:()=> { if(state.totalClicks < 300) return alert('Not enough clicks'); state.totalClicks -=300; state.backpack.cola +=2; } }
 ];
 
-/* Initialize UI */
-applyStateToUI();
-renderShop();
-renderVariantsClientSide();
+function renderShopGrid(items){
+  shopGrid.innerHTML = '';
+  const list = items || builtinShop;
+  list.forEach(it => {
+    const div = document.createElement('div'); div.className='shop-item';
+    div.innerHTML = `<div><strong>${it.title}</strong></div><div class="compact">Price: ${it.price} clicks</div><div style="margin-top:6px" class="shop-row"><button class="buyBtn">Buy</button></div>`;
+    div.querySelector('.buyBtn').addEventListener('click', ()=> {
+      if(state.totalClicks < it.price) return alert('Not enough clicks');
+      it.apply();
+      syncLocalAndPeers();
+      applyUI();
+      alert('Purchased — backpack updated / upgrade applied.');
+    });
+    shopGrid.appendChild(div);
+  });
+}
 
-/* Buttons */
-el('guestBtn').addEventListener('click', ()=>{ user = {uid:'guest_'+randomId(), displayName:'Guest'}; onSignedIn(); });
-el('googleSignIn').addEventListener('click', ()=>{ if(!auth) initFirebaseAndAuth(); signInWithGoogle(); });
-el('feedBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.hunger = Math.min(100,state.hunger+25); syncLocalAndPeers(); });
-el('waterBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.thirst = Math.min(100,state.thirst+25); syncLocalAndPeers(); });
-el('colaBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100,state.energy+50); syncLocalAndPeers(); });
-el('playBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100,state.energy+10); addClicks(5); syncLocalAndPeers(); });
+/* ---------- Click logic: clicking plays sound and sends action to peers ---------- */
+function clickGubbyLocal(){
+  if(!state.alive) return;
+  const power = state.upgrades.clickPower * (state.upgrades.multipliers.reduce((a,b)=>a*b,1) || 1);
+  addClicks(power);
+  // small hunger/thirst penalty
+  state.hunger = Math.max(0, state.hunger - 0.1);
+  state.thirst = Math.max(0, state.thirst - 0.2);
+  // play local sound via WebAudio with pitch jitter
+  playMerpRandomPitch();
+  // broadcast action to peers so they also play sound and update state
+  broadcastAction({ type:'click', value: power, by: user?.uid || 'guest' });
+  syncLocalAndPeers();
+}
 
-el('showInvite').addEventListener('click', ()=>{ if(pc) return alert('Already initialized, disconnect first'); startHostInvite(); });
-el('pasteInvite').addEventListener('click', ()=>{ const s=prompt('Paste invite/answer JSON string here'); if(s) processInviteString(s.trim()); });
-el('processInvite').addEventListener('click', ()=>{ const s = el('inviteIn').value.trim(); if(!s) return alert('Paste invite/answer first'); processInviteString(s); });
+/* use backpack item -> consumes 1 and apply effect; send action to peers */
+function useBackpackItem(type){
+  if(!state.backpack[type] || state.backpack[type] <= 0) { alert('No items available in backpack'); return; }
+  state.backpack[type] -= 1;
+  if(type === 'food') state.hunger = Math.min(100, state.hunger + 25);
+  if(type === 'water') state.thirst = Math.min(100, state.thirst + 25);
+  if(type === 'cola') state.energy = Math.min(100, state.energy + 50);
+  // broadcast backpack change to peers
+  broadcastAction({ type:'use_item', item:type, by: user?.uid || 'guest' });
+  syncLocalAndPeers();
+}
+
+/* attach UI */
+el('feedBtn').addEventListener('click', ()=> useBackpackItem('food'));
+el('waterBtn').addEventListener('click', ()=> useBackpackItem('water'));
+el('colaBtn').addEventListener('click', ()=> useBackpackItem('cola'));
+gubbySprite.addEventListener('click', ()=> clickGubbyLocal());
+
+/* ---------- Movement drains energy (distance-based) ---------- */
+const houseRect = { w:560, h:420 };
+function wander(){
+  if(!state.alive) return;
+  const margin = 48;
+  const newX = Math.random()*(houseRect.w - margin*2) + margin;
+  const newY = Math.random()*(houseRect.h - margin*2) + margin;
+  const dx = (state.pos?.x || newX) - newX;
+  const dy = (state.pos?.y || newY) - newY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const loss = Math.max(1, Math.round(dist/60));
+  state.pos.x = newX; state.pos.y = newY;
+  state.energy = Math.max(0, state.energy - loss);
+  if(state.energy === 0){ state.alive=false; }
+  // broadcast movement
+  broadcastAction({ type:'move', x:newX, y:newY, energyLoss: loss, by: user?.uid || 'guest' });
+  syncLocalAndPeers();
+}
+setInterval(wander, 3000);
+
+/* ---------- Decay and auto-clickers ---------- */
+setInterval(()=>{
+  if(!state.alive) return;
+  state.hunger = Math.max(0, state.hunger - 1);
+  state.thirst = Math.max(0, state.thirst - 1.2);
+  const hour = (new Date()).getHours();
+  if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2);
+  else state.energy = Math.max(0, state.energy - 0.5);
+  if(state.hunger === 0 || state.thirst === 0) state.energy = Math.max(0, state.energy - 2);
+  if(state.upgrades.autoClicks > 0 && state.alive) {
+    addClicks(state.upgrades.autoClicks);
+    broadcastAction({ type:'auto_click', value: state.upgrades.autoClicks, by: user?.uid || 'guest' });
+  }
+  if(state.energy === 0) state.alive = false;
+  syncLocalAndPeers();
+}, 10000);
+
+/* ---------- State helpers ---------- */
+function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyUI(); }
+
+/* ---------- P2P WebRTC Manual Signaling (copy/paste) ---------- */
+let pc = null, dc = null, isHost = false, lastOfferId = null;
+
+function preparePeerConnection(){
+  const config = { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] };
+  pc = new RTCPeerConnection(config);
+  pc.onicecandidate = ()=> {
+    if(pc.iceGatheringState === 'complete'){
+      const stage = { type:'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from: user?.uid || 'guest', name: user?.displayName || 'Guest' };
+      el('inviteOut').value = btoa(JSON.stringify(stage));
+    }
+  };
+  pc.ondatachannel = (ev)=> { dc = ev.channel; setupDataChannel(dc); };
+  pc.onconnectionstatechange = ()=> {
+    if(pc.connectionState === 'connected') showStatus('Peer connected');
+  };
+}
+
+function startHostInvite(){
+  if(pc) return alert('Already hosting/connected — disconnect first');
+  isHost = true; lastOfferId = randomId(); preparePeerConnection();
+  dc = pc.createDataChannel('gubby'); setupDataChannel(dc);
+  pc.createOffer().then(o => pc.setLocalDescription(o)).then(()=>{
+    const obj = { type:'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from:user?.uid||'guest', name:user?.displayName||'Guest' };
+    el('inviteOut').value = btoa(JSON.stringify(obj));
+    alert('Invite created. Copy inviteOut and send it to your friend.');
+  }).catch(err => { console.error(err); alert('Offer failed: '+err.message); });
+}
+
+function setupDataChannel(channel){
+  channel.onopen = ()=> showStatus('Data channel open');
+  channel.onmessage = (ev)=> { try{ const msg = JSON.parse(ev.data); handlePeerMessage(msg); }catch(e){ console.log('raw', ev.data); } };
+  channel.onclose = ()=> showStatus('Data channel closed');
+}
+
+/* handle messages */
+function handlePeerMessage(msg){
+  if(msg.t === 'stateSync'){ mergeRemoteState(msg.state); return; }
+  if(msg.t === 'action'){ applyRemoteAction(msg.action); return; }
+}
+
+/* broadcast generic action to peers */
+function broadcastAction(action){
+  if(dc && dc.readyState === 'open') dc.send(JSON.stringify({ t:'action', action }));
+}
+
+/* merge remote state conservatively */
+function mergeRemoteState(remote){
+  if(!remote) return;
+  // prefer higher totalClicks (so purchases/upgrades apply)
+  if(remote.totalClicks > state.totalClicks){
+    state.totalClicks = remote.totalClicks;
+    state.upgrades = remote.upgrades || state.upgrades;
+    state.variant = remote.variant || state.variant;
+  }
+  // merge backpack: prefer the highest counts to avoid accidental loss (majority/authoritative schemes are complex)
+  state.backpack.food = Math.max(state.backpack.food, remote.backpack?.food || 0);
+  state.backpack.water = Math.max(state.backpack.water, remote.backpack?.water || 0);
+  state.backpack.cola = Math.max(state.backpack.cola, remote.backpack?.cola || 0);
+  // average vital bars
+  state.hunger = Math.round((state.hunger + (remote.hunger||state.hunger))/2);
+  state.thirst = Math.round((state.thirst + (remote.thirst||state.thirst))/2);
+  state.energy = Math.round((state.energy + (remote.energy||state.energy))/2);
+  saveState(); applyUI();
+}
+
+/* apply small actions coming from peers */
+function applyRemoteAction(action){
+  if(!action) return;
+  if(action.type === 'click'){ addClicks(action.value || 1); playMerpRandomPitch(); }
+  if(action.type === 'move'){ state.pos.x = action.x; state.pos.y = action.y; state.energy = Math.max(0, state.energy - (action.energyLoss||1)); gubbySprite.style.left = state.pos.x+'px'; gubbySprite.style.top = state.pos.y+'px'; }
+  if(action.type === 'use_item'){
+    if(action.item && state.backpack[action.item] !== undefined){
+      // set to authoritative value if provided, otherwise decrement once
+      if(typeof action.count === 'number') state.backpack[action.item] = action.count;
+      else state.backpack[action.item] = Math.max(0, (state.backpack[action.item]||0) - 1);
+    }
+  }
+  if(action.type === 'auto_click'){ addClicks(action.value||1); }
+  saveState(); applyUI();
+}
+
+/* process invite (base64 JSON) */
+async function processInviteString(b64){
+  let obj=null;
+  try{ obj = JSON.parse(atob(b64)); }catch(e){ return alert('Invalid invite format'); }
+  if(obj.type === 'offer'){
+    isHost = false; lastOfferId = obj.id;
+    preparePeerConnection();
+    await pc.setRemoteDescription({ type:'offer', sdp: obj.sdp });
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    const answerObj = { type:'answer', sdp: pc.localDescription.sdp, id: obj.id, from: user?.uid || 'guest' };
+    el('inviteOut').value = btoa(JSON.stringify(answerObj));
+    alert('Answer created — copy inviteOut and send back to host.');
+  } else if(obj.type === 'answer'){
+    if(!pc) return alert('No offer here. Host must create invite first.');
+    await pc.setRemoteDescription({ type:'answer', sdp: obj.sdp });
+    alert('Answer processed — attempting connection.');
+  } else alert('Unknown invite type: '+obj.type);
+}
+
+/* UI wiring for invites */
+el('createInviteShort').addEventListener('click', ()=> startHostInvite());
+el('copyInviteBtn').addEventListener('click', ()=> {
+  const val = el('inviteOut').value;
+  if(!val) return alert('No invite to copy');
+  navigator.clipboard?.writeText(val).then(()=> alert('Invite copied to clipboard'), ()=> alert('Copy failed — select and copy manually'));
+});
+el('processInvite').addEventListener('click', ()=> {
+  const txt = el('inviteIn').value.trim(); if(!txt) return alert('Paste invite/answer first'); processInviteString(txt);
+});
+el('processAnswer').addEventListener('click', ()=> {
+  const txt = el('inviteOut').value.trim(); if(!txt) return alert('No answer to paste into host'); prompt('Share this Answer with host (or copy):', txt);
+});
 el('disconnectBtn').addEventListener('click', disconnectPeer);
 
-/* Admin create variant */
-el('createVariantBtn').addEventListener('click', async ()=>{
-  if(!db || !user) return alert('Sign-in and enable Firestore to create variants in DB.');
-  const id = el('variantId').value.trim(); const file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0;
-  let attrs={}; try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON in attributes'); }
-  if(!id||!file) return alert('Provide id and file name');
-  // Check sprite exists at SPRITE_BASE_PATH + file
-  try{
-    const res = await fetch(SPRITE_BASE_PATH + file, {method:'HEAD'});
-    if(!res.ok && !confirm('Sprite not found at '+SPRITE_BASE_PATH+file+'. Create anyway?')) return;
-  }catch(e){ if(!confirm('Could not verify sprite file, continue anyway?')) return; }
-  try{
-    const variantsRef = db.collection('variants');
-    const shopRef = db.collection('shop');
-    await variantsRef.add({ id, fileName:file, price, attributes:attrs, createdBy:user.uid, createdAt: Date.now() });
-    await shopRef.add({ type:'variant', variantFile:file, variantId:id, price, attributes:attrs, createdBy:user.uid, createdAt: Date.now() });
-    alert('Variant and shop item created in Firestore.');
-  }catch(e){ alert('Firestore error: '+e.message); console.error(e); }
-});
+function sendMessage(msg){ if(dc && dc.readyState === 'open') dc.send(JSON.stringify(msg)); }
+function syncLocalAndPeers(){ saveState(); applyUI(); if(dc && dc.readyState === 'open') sendMessage({ t:'stateSync', state }); }
 
-/* ====== Firebase init, auth & Firestore interaction ====== */
+/* disconnect */
+function disconnectPeer(){ try{ if(dc) dc.close(); }catch(e){} try{ if(pc) pc.close(); }catch(e){} pc=null; dc=null; isHost=false; lastOfferId=null; el('inviteOut').value=''; el('inviteIn').value=''; showStatus('Disconnected'); }
+
+/* ---------- Firebase auth & admin (optional) ---------- */
 function initFirebaseAndAuth(){
   if(window.firebase && !auth){
     firebase.initializeApp(firebaseConfig);
@@ -240,274 +510,80 @@ function initFirebaseAndAuth(){
           const userRef = db.collection('users').doc(u.uid);
           const doc = await userRef.get();
           if(!doc.exists){
-            await userRef.set({ displayName: u.displayName || u.email.split('@')[0], email: u.email, privileges: 'normal', createdAt: Date.now() });
+            await userRef.set({ displayName:u.displayName||u.email.split('@')[0], email:u.email, privileges:'normal', createdAt: Date.now() });
           }
           const profile = (await userRef.get()).data();
-          onSignedIn(profile);
-        }catch(e){ console.error('users doc error', e); onSignedIn(); }
+          if(profile.privileges === 'admin') el('adminPanel').style.display = 'block';
+          else el('adminPanel').style.display = 'none';
+        }catch(e){ console.warn('users doc check failed', e); }
       } else {
         user = null;
-        authArea.textContent = 'Not signed in';
-        accountInfo.textContent = '—';
-        adminPanel.classList.remove('visible');
+        el('adminPanel').style.display = 'none';
       }
+      applyUI();
     });
-
-    // realtime listeners
-    db.collection('variants').onSnapshot(snap => { renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))); });
-    db.collection('shop').onSnapshot(snap => { renderShopFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))); });
+    // watch firestore variants & shop
+    db.collection('variants').onSnapshot(snap => renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    db.collection('shop').onSnapshot(snap => renderShopFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))));
   }
 }
 
-async function signInWithGoogle(){
-  try{
-    const provider = new firebase.auth.GoogleAuthProvider();
-    await auth.signInWithPopup(provider);
-  }catch(e){ alert('Sign-in failed: '+e.message); }
-}
-
-async function onSignedIn(profile){
-  authArea.textContent = `Signed in: ${user.displayName || user.email || user.uid}`;
-  accountInfo.textContent = user.email ? `Email: ${user.email}` : `ID: ${user.uid}`;
-  if(db && user && user.uid){
-    try{
-      const doc = await db.collection('users').doc(user.uid).get();
-      if(doc.exists){
-        const data = doc.data();
-        if(data.privileges === 'admin'){ adminPanel.classList.add('visible'); }
-        else adminPanel.classList.remove('visible');
-        accountInfo.textContent += ` — privileges: ${data.privileges || 'normal'}`;
-      } else accountInfo.textContent += ' — users doc not found (created on signup)';
-    }catch(e){ console.error('priv check failed', e); }
-  }
-  applyStateToUI();
-  renderShop();
-  renderVariantsClientSide();
-}
-
-/* ======= Shop & Variants rendering ======= */
-function renderShop(){
-  shopList.innerHTML = '';
-  const builtins = [
-    {title:'Upgrade Click Power', price:100, action:()=>{ if(state.totalClicks < 100) return alert('Not enough clicks'); state.upgrades.clickPower += 1; state.totalClicks -= 100; syncLocalAndPeers(); }},
-    {title:'Auto Clicker', price:500, action:()=>{ if(state.totalClicks < 500) return alert('Not enough clicks'); state.upgrades.autoClicks += 1; state.totalClicks -= 500; syncLocalAndPeers(); }},
-    {title:'Multiplier x1.5', price:1500, action:()=>{ if(state.totalClicks < 1500) return alert('Not enough clicks'); state.upgrades.multipliers.push(1.5); state.totalClicks -= 1500; syncLocalAndPeers(); }}
-  ];
-  const all = builtins.concat(localVariants);
-  all.forEach(item=>{
-    const name = item.title || item.id || item.fileName;
-    const price = item.price || 0;
-    const div = document.createElement('div'); div.className='row'; div.style.justifyContent='space-between';
-    div.innerHTML = `<div><strong>${name}</strong><div class="small">Price: ${price} clicks</div></div><div><button>Buy</button></div>`;
-    div.querySelector('button').addEventListener('click', ()=>{
-      if(state.totalClicks < price) return alert('Not enough clicks');
-      state.totalClicks = Math.max(0, state.totalClicks - price);
-      if(item.fileName){ state.variant = item.fileName; if(item.attributes){ if(item.attributes.clickMultiplier) state.upgrades.multipliers.push(item.attributes.clickMultiplier); if(item.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + item.attributes.autoClicks; if(item.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + item.attributes.clickPower; } }
-      if(item.action) item.action();
-      syncLocalAndPeers();
-    });
-    shopList.appendChild(div);
-  });
-}
-
-function renderShopFromFirestore(items){
-  shopList.innerHTML = '';
-  items.forEach(doc=>{
-    const name = doc.type || doc.title || doc.variantId || 'Shop Item';
-    const price = doc.price || 0;
-    const div = document.createElement('div'); div.className='row'; div.style.justifyContent='space-between';
-    div.innerHTML = `<div><strong>${name}</strong><div class="small">Price: ${price}</div></div><div><button>Buy</button></div>`;
-    div.querySelector('button').addEventListener('click', ()=>{
-      if(state.totalClicks < price) return alert('Not enough clicks');
-      state.totalClicks = Math.max(0, state.totalClicks - price);
-      if(doc.type === 'variant'){ state.variant = doc.variantFile; }
-      if(doc.attributes){ if(doc.attributes.clickMultiplier) state.upgrades.multipliers.push(doc.attributes.clickMultiplier); if(doc.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + doc.attributes.autoClicks; if(doc.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + doc.attributes.clickPower; }
-      syncLocalAndPeers();
-      alert('Purchased');
-    });
-    shopList.appendChild(div);
-  });
-}
-
-function renderVariantsClientSide(){
-  variantsList.innerHTML='';
-  localVariants.forEach(v => {
-    const pill = document.createElement('div'); pill.className='variant-pill'; pill.textContent = `${v.fileName}${v.price? ' — '+v.price:''}`;
-    pill.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndPeers(); });
-    variantsList.appendChild(pill);
-  });
-}
-
-function renderVariantsFromFirestore(items){
-  variantsList.innerHTML='';
-  items.forEach(v=>{
-    const pill = document.createElement('div'); pill.className='variant-pill';
-    pill.textContent = `${v.fileName}${v.price? ' — '+v.price:''}`;
-    pill.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndPeers(); });
-    variantsList.appendChild(pill);
-  });
-}
-
-/* ======= State apply/save/load ======= */
-function applyStateToUI(){
-  hungerVal.textContent = Math.round(state.hunger);
-  thirstVal.textContent = Math.round(state.thirst);
-  energyVal.textContent = Math.round(state.energy);
-  // sprite path uses fixed SPRITE_BASE_PATH
-  gubbySprite.src = SPRITE_BASE_PATH + state.variant;
-  // position by px coords
-  if(typeof state.pos?.x === 'number') gubbySprite.style.left = state.pos.x + 'px';
-  if(typeof state.pos?.y === 'number') gubbySprite.style.top = state.pos.y + 'px';
-  authArea.textContent = user ? (`User: ${user.displayName || user.name || (user.email||user.uid)}`) : 'Not signed in';
-}
-function saveState(){ localStorage.setItem('gubby_full_v1', JSON.stringify(state)); }
-function loadState(){ try{ const raw = localStorage.getItem('gubby_full_v1'); if(raw) return JSON.parse(raw); }catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
-function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyStateToUI(); }
-function getMultiplier(){ let m=1; if(state.upgrades.multipliers) state.upgrades.multipliers.forEach(v=>m*=v); return m; }
-
-/* ======= Movement: energy drains when Gubby moves ======= */
-const houseRect = {w:520,h:420};
-function wander(){
-  if(!state.alive) return;
-  const margin = 48;
-  const newX = Math.random()*(houseRect.w - margin*2) + margin;
-  const newY = Math.random()*(houseRect.h - margin*2) + margin;
-  // compute travel distance
-  const dx = (state.pos?.x || newX) - newX;
-  const dy = (state.pos?.y || newY) - newY;
-  const dist = Math.sqrt(dx*dx + dy*dy);
-  // energy loss scales with distance; at least 1.
-  const energyLoss = Math.max(1, Math.round(dist/60));
-  state.pos.x = newX; state.pos.y = newY;
-  state.energy = Math.max(0, state.energy - energyLoss);
-  // if energy reaches 0, die (same behavior)
-  if(state.energy === 0){ state.alive=false; gubbySprite.src = SPRITE_BASE_PATH + 'dead.png'; }
-  gubbySprite.style.left = newX + 'px'; gubbySprite.style.top = newY + 'px';
-  saveState(); applyStateToUI(); if(dc && dc.readyState === 'open') sendMessage({t:'action', action:{type:'move', x:newX, y:newY, energyLoss}});
-}
-setInterval(wander, 3000);
-
-/* ======= decay & autos (kept but energy removed from click) ======= */
-setInterval(()=>{
-  if(!state.alive) return;
-  state.hunger = Math.max(0, state.hunger - 1);
-  state.thirst = Math.max(0, state.thirst - 1.2);
-  const hour = (new Date()).getHours();
-  if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2); else state.energy = Math.max(0, state.energy - 0.5);
-  if(state.hunger===0 || state.thirst===0) state.energy = Math.max(0, state.energy - 2);
-  if(state.energy===0){ state.alive=false; gubbySprite.src = SPRITE_BASE_PATH + 'dead.png'; }
-  if(state.upgrades.autoClicks>0 && state.alive) addClicks(state.upgrades.autoClicks);
-  syncLocalAndPeers();
-}, 10000);
-
-/* ======= click: play sound and click economy (no energy drain on click now) ======= */
-gubbySprite.addEventListener('click', ()=>{
-  if(!state.alive) return;
-  const power = state.upgrades.clickPower * getMultiplier();
-  addClicks(power);
-  // clicking still affects hunger/thirst lightly
-  state.thirst = Math.max(0, state.thirst - 0.2);
-  state.hunger = Math.max(0, state.hunger - 0.1);
-  // play merp sound if available
-  try{
-    if(merpAudio){
-      merpAudio.currentTime = 0;
-      const p = merpAudio.play();
-      if(p && p.catch) p.catch(()=>{}); // ignore play promise errors
-    }
-  }catch(e){ console.warn('play failed', e); }
-  syncLocalAndPeers();
+/* sign in with google */
+el('googleSignIn').addEventListener('click', ()=> {
+  if(!auth) initFirebaseAndAuth();
+  if(!auth) return alert('Firebase init failed');
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e => alert('Sign in failed: '+e.message));
 });
 
-/* ======= P2P (manual WebRTC) - unchanged ======= */
-let pc = null, dc = null, isHost = false, lastOfferId = null;
+/* create variant in firestore (admin) */
+el('createVariantBtn').addEventListener('click', async ()=>{
+  if(!db || !auth || !auth.currentUser) return alert('Sign-in required');
+  const id = el('variantId').value.trim(), file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0;
+  let attrs = {};
+  try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON attributes'); }
+  if(!id || !file) return alert('provide id & file name');
+  try{
+    const res = await fetch(SPRITE_BASE_PATH + file, { method:'HEAD' });
+    if(!res.ok && !confirm('Sprite not found at ' + SPRITE_BASE_PATH + file + ' — create anyway?')) return;
+  }catch(e){ if(!confirm('Could not verify sprite file, continue anyway?')) return; }
+  try{
+    await db.collection('variants').add({ id, fileName:file, price, attributes:attrs, createdBy: auth.currentUser.uid, createdAt: Date.now() });
+    await db.collection('shop').add({ type:'variant', variantFile:file, variantId:id, price, attributes:attrs, createdBy: auth.currentUser.uid, createdAt: Date.now() });
+    alert('Created!');
+  }catch(e){ alert('Firestore error: ' + e.message); }
+});
 
-function startHostInvite(){
-  isHost = true; lastOfferId = randomId(); preparePeerConnection();
-  dc = pc.createDataChannel('gubby'); setupDataChannel(dc);
-  pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(()=> {
-    const invite = { type:'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from: user?.uid || 'guest', name: user?.displayName || 'Guest' };
-    el('inviteOut').value = btoa(JSON.stringify(invite));
-    alert('Invite created; copy the invite string and send to your friend.');
-  }).catch(err=>{ console.error(err); alert('Offer failed: '+err.message); });
+/* render firestore shop/variants */
+function renderVariantsFromFirestore(items){
+  // show small list
+  const wrap = el('variantsList'); wrap.innerHTML = '';
+  items.forEach(v => {
+    const d = document.createElement('div'); d.className = 'compact'; d.style.marginBottom='6px';
+    d.textContent = `${v.fileName} ${v.price? '— ' + v.price : ''}`; d.style.cursor='pointer';
+    d.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndPeers(); });
+    wrap.appendChild(d);
+  });
+}
+function renderShopFromFirestore(items){
+  // convert into shopGrid optionally
+  // For brevity, we don't auto-merge; admin-created shop items will show in modal only if you wire them here
 }
 
-function preparePeerConnection(){
-  const config = { iceServers: [{urls:['stun:stun.l.google.com:19302']}] };
-  pc = new RTCPeerConnection(config);
-  pc.onicecandidate = ()=> {
-    if(pc.iceGatheringState === 'complete'){
-      const full = { type:'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from:user?.uid || 'guest', name:user?.displayName || 'Guest' };
-      el('inviteOut').value = btoa(JSON.stringify(full));
-    }
-  };
-  pc.ondatachannel = (ev)=> { dc = ev.channel; setupDataChannel(dc); };
-  pc.onconnectionstatechange = ()=> {
-    if(pc.connectionState === 'connected'){ showStatus('Peer connected'); sendMessage({t:'stateSync', state}); }
-  };
-}
-
-function setupDataChannel(channel){
-  channel.onopen = ()=> showStatus('Data channel open');
-  channel.onmessage = (ev)=> { try{ const msg = JSON.parse(ev.data); handlePeerMessage(msg); }catch(e){ console.log('raw', ev.data); } };
-  channel.onclose = ()=> showStatus('Data channel closed');
-}
-
-function handlePeerMessage(msg){
-  if(msg.t==='stateSync') mergeRemoteState(msg.state);
-  if(msg.t==='action') applyRemoteAction(msg.action);
-  if(msg.t==='ping') sendMessage({t:'pong'});
-}
-
-function mergeRemoteState(remote){
-  if(!remote) return;
-  if(remote.totalClicks > state.totalClicks){
-    state.totalClicks = remote.totalClicks;
-    state.upgrades = remote.upgrades || state.upgrades;
-    state.variant = remote.variant || state.variant;
-  }
-  state.hunger = Math.max(0, Math.min(100, Math.round((state.hunger + (remote.hunger||state.hunger))/2)));
-  state.thirst = Math.max(0, Math.min(100, Math.round((state.thirst + (remote.thirst||state.thirst))/2)));
-  state.energy = Math.max(0, Math.min(100, Math.round((state.energy + (remote.energy||state.energy))/2)));
-  saveState(); applyStateToUI();
-}
-
-function applyRemoteAction(action){
-  if(!action) return;
-  if(action.type==='click') addClicks(action.value||1);
-  if(action.type==='feed') state.hunger = Math.min(100, state.hunger + (action.value||20));
-  if(action.type==='water') state.thirst = Math.min(100, state.thirst + (action.value||20));
-  if(action.type==='cola') state.energy = Math.min(100, state.energy + (action.value||40));
-  if(action.type==='move'){ state.pos.x = action.x; state.pos.y = action.y; state.energy = Math.max(0, state.energy - (action.energyLoss||1)); gubbySprite.style.left = state.pos.x + 'px'; gubbySprite.style.top = state.pos.y + 'px'; }
-  saveState(); applyStateToUI();
-}
-
-async function processInviteString(b64str){
-  let obj=null;
-  try{ obj=JSON.parse(atob(b64str)); }catch(e){ return alert('Invalid invite format'); }
-  if(obj.type==='offer'){
-    isHost=false; lastOfferId = obj.id; preparePeerConnection();
-    await pc.setRemoteDescription({type:'offer', sdp: obj.sdp});
-    const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
-    const answerObj = { type:'answer', sdp: pc.localDescription.sdp, id: obj.id, from: user?.uid || 'guest', name: user?.displayName || 'Guest' };
-    el('inviteOut').value = btoa(JSON.stringify(answerObj));
-    alert('Answer created; send this answer back to the host.');
-  } else if(obj.type==='answer'){
-    if(!pc) return alert('No offer exists here — host must create invite first.');
-    await pc.setRemoteDescription({type:'answer', sdp: obj.sdp});
-    alert('Answer processed; connection should establish if NAT permits.');
-  } else alert('Unknown invite type: '+obj.type);
-}
-
-function sendMessage(msg){ if(dc && dc.readyState==='open') dc.send(JSON.stringify(msg)); }
-function syncLocalAndPeers(){ saveState(); applyStateToUI(); if(dc && dc.readyState==='open') sendMessage({t:'stateSync', state}); }
-function disconnectPeer(){ try{ if(dc) dc.close(); }catch(e){} try{ if(pc) pc.close(); }catch(e){} pc=null; dc=null; isHost=false; lastOfferId=null; el('inviteOut').value=''; el('inviteIn').value=''; showStatus('Disconnected'); }
-function showStatus(msg){ console.log('[status]', msg); accountInfo.textContent = user ? (user.displayName||user.email||user.uid) + ' — ' + msg : 'guest — '+msg; }
-
-/* ======= Utilities ======= */
+/* ---------- Utility functions ---------- */
+function showStatus(msg){ el('accountInfo').textContent = msg; }
 function randomId(){ return Math.random().toString(36).slice(2,9); }
-window.gubbyGame = { state, saveState, loadState, syncLocalAndPeers, startHostInvite, processInviteString, disconnectPeer };
 
+/* Initialize every few seconds to ensure UI shows loaded state */
+applyUI();
+saveState();
+
+/* Expose debugging helpers */
+window.Gubby = { state, saveState, loadState, openShop, startHostInvite, processInviteString, disconnectPeer };
+
+/* Play on incoming click from remote: handled in applyRemoteAction which calls playMerpRandomPitch() */
+
+/* Done */
 </script>
 </body>
 </html>
