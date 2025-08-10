@@ -3,83 +3,94 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Gubby Clicker — Firestore Multiplayer</title>
+<title>Gubby Clicker — Rooms (Firestore)</title>
 
 <style>
 :root{
-  --bg1:#ffffff; --bg2:#f5fbff;
-  --accent:#6bc8ff; --accent2:#89ddff;
-  --muted:#6b7280; --card:#fff;
+  --bg:#ffffff;
+  --bg-2:#f5fbff;
+  --accent:#6bc8ff;
+  --accent-2:#89ddff;
+  --accent-room:#ffd28a;
+  --accent-room-2:#ffd4a3;
+  --muted:#6b7280;
+  --card:#fff;
 }
 *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
-html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),var(--bg-2));display:flex;align-items:center;justify-content:center;transition:background .25s ease}
+body.multiplayer-mode{background:linear-gradient(180deg,#fff7ec,#fffaf5)}
 .wrap{width:1100px;background:var(--card);border-radius:14px;box-shadow:0 18px 60px rgba(10,20,40,0.12);overflow:hidden;display:grid;grid-template-rows:auto 1fr;animation:appear .35s ease}
 @keyframes appear{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(12,40,80,0.03)}
 .header-left{display:flex;align-items:center;gap:12px}
-.logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;box-shadow:0 6px 18px rgba(75,110,255,0.12);transform:translateZ(0)}
-h1{font-size:18px;margin:0}
-.top-controls{display:flex;gap:10px;align-items:center}
+.logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:white;font-weight:800;box-shadow:0 6px 18px rgba(75,110,255,0.12)}
+h1{font-size:20px;margin:0}
+.top-controls{display:flex;gap:12px;align-items:center}
 .small-muted{font-size:13px;color:var(--muted)}
 
 /* main layout */
-.main{display:grid;grid-template-columns:1fr 360px;gap:18px;padding:18px}
-.game-card{background:linear-gradient(180deg,#ffffff,#f4fbff);border-radius:12px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:inset 0 -10px 30px rgba(100,140,255,0.02)}
-.house{width:620px;height:460px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#eaf8ff);position:relative;overflow:hidden;border:1px solid rgba(12,40,80,0.05)}
-.gubby-sprite{position:absolute;transform:translate(-50%,-50%);width:110px;height:110px;transition:transform .35s linear,left .45s linear, top .45s linear;pointer-events:auto;z-index:30;will-change:transform,left,top;display:block}
-@keyframes floaty{0%{transform:translate(-50%,-50%) translateY(0)}50%{transform:translate(-50%,-50%) translateY(-6px)}100%{transform:translate(-50%,-50%) translateY(0)}}
+.main{display:grid;grid-template-columns:1fr 380px;gap:18px;padding:18px}
+.game-card{background:linear-gradient(180deg,#ffffff,#fdfdfd);border-radius:12px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:inset 0 -10px 30px rgba(100,140,255,0.02)}
+.house{width:680px;height:460px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#eaf8ff);position:relative;overflow:hidden;border:1px solid rgba(12,40,80,0.05)}
+.gubby-sprite{position:absolute;transform:translate(-50%,-50%);width:120px;height:120px;transition:transform .35s linear,left .45s linear, top .45s linear;pointer-events:auto;z-index:30;will-change:transform,left,top;display:block}
 .gubby-float{animation:floaty 3s ease-in-out infinite}
+@keyframes floaty{0%{transform:translate(-50%,-50%) translateY(0)}50%{transform:translate(-50%,-50%) translateY(-8px)}100%{transform:translate(-50%,-50%) translateY(0)}}
 
 /* HUD */
 .hud{display:flex;gap:12px;width:100%;justify-content:center}
-.stat{background:var(--card);border-radius:10px;padding:10px 14px;border:1px solid rgba(12,40,80,0.04);min-width:150px;text-align:center;box-shadow:0 6px 18px rgba(80,110,255,0.03)}
+.stat{background:var(--card);border-radius:12px;padding:12px 18px;border:1px solid rgba(12,40,80,0.04);min-width:170px;text-align:center;box-shadow:0 6px 18px rgba(80,110,255,0.03)}
 .stat .label{font-size:12px;color:var(--muted)}
-.stat .value{font-weight:700;font-size:18px;margin-top:6px}
-.stat .bar{height:10px;background:#edf2ff;border-radius:999px;margin-top:8px;overflow:hidden}
-.stat .fill{height:100%;width:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .25s ease}
+.stat .value{font-weight:800;font-size:20px;margin-top:6px}
+.stat .bar{height:12px;background:#edf2ff;border-radius:999px;margin-top:8px;overflow:hidden}
+.stat .fill{height:100%;width:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .25s ease}
+
+/* room palette when multiplayer */
+body.multiplayer-mode .stat .fill{background:linear-gradient(90deg,var(--accent-room),var(--accent-room-2))}
 
 /* controls row */
-.controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
-button{padding:10px 12px;border-radius:10px;border:0;background:var(--accent);color:white;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(75,110,255,0.08);transition:transform .12s ease,box-shadow .12s ease}
-button.secondary{background:white;color:var(--accent);border:1px solid rgba(75,110,255,0.12);font-weight:700}
-button.ghost{background:transparent;color:var(--muted);border:1px solid rgba(12,40,80,0.04)}
-button:hover{transform:translateY(-3px);box-shadow:0 18px 36px rgba(75,110,255,0.12)}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.btn{padding:12px 14px;border-radius:12px;border:0;background:var(--accent);color:white;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(75,110,255,0.08);transition:transform .12s ease,box-shadow .12s ease}
+.btn.secondary{background:white;color:var(--accent);border:1px solid rgba(75,110,255,0.12)}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid rgba(12,40,80,0.04)}
+.btn:hover{transform:translateY(-3px);box-shadow:0 18px 36px rgba(75,110,255,0.12)}
 
 /* right column panels */
 .right-col{display:flex;flex-direction:column;gap:12px}
-.panel{background:white;border-radius:10px;padding:12px;border:1px solid rgba(12,40,80,0.04)}
+.panel{background:white;border-radius:12px;padding:14px;border:1px solid rgba(12,40,80,0.04)}
+.panel h4{margin:0 0 8px 0}
 .compact{font-size:13px;color:var(--muted)}
 .backpack{display:flex;gap:12px;align-items:center}
-.bp-item{display:flex;flex-direction:column;align-items:center;font-size:13px;color:var(--muted);padding:6px 8px;border-radius:8px;border:1px solid rgba(12,40,80,0.03);background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(250,250,255,0.95))}
-.bp-qty{font-weight:800;color:#111}
+.bp-item{display:flex;flex-direction:column;align-items:center;font-size:13px;color:var(--muted);padding:6px 8px;border-radius:10px;border:1px solid rgba(12,40,80,0.03);background:linear-gradient(180deg, rgba(255,255,255,0.97), rgba(250,250,255,0.95))}
+.bp-qty{font-weight:900;color:#111}
 
 /* variants list */
 .variants-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-.variant-item{padding:8px;border-radius:8px;border:1px solid rgba(12,40,80,0.03);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.variant-item{padding:8px;border-radius:10px;border:1px solid rgba(12,40,80,0.03);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
 .variant-item:hover{background:linear-gradient(180deg,rgba(245,250,255,0.6),white)}
+
+/* member list */
+.member-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.member-item{display:flex;gap:8px;align-items:center;padding:6px;border-radius:8px;border:1px solid rgba(12,40,80,0.03)}
 
 /* modal overlay & modal */
 .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,40,0.45);display:none;align-items:center;justify-content:center;z-index:200}
-.modal{width:680px;background:white;border-radius:12px;padding:18px;box-shadow:0 30px 80px rgba(12,40,80,0.35);transform:translateY(20px);opacity:0;transition:all .28s cubic-bezier(.2,.9,.2,1)}
+.modal{width:600px;background:white;border-radius:12px;padding:18px;box-shadow:0 30px 80px rgba(12,40,80,0.35);transform:translateY(20px);opacity:0;transition:all .28s cubic-bezier(.2,.9,.2,1)}
 .modal.show{transform:translateY(0);opacity:1}
+
+/* shop */
 .shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-.shop-item{border-radius:10px;border:1px solid rgba(12,40,80,0.04);padding:12px;display:flex;flex-direction:column;gap:8px;transition:transform .12s}
+.shop-item{border-radius:12px;border:1px solid rgba(12,40,80,0.04);padding:12px;display:flex;flex-direction:column;gap:8px;transition:transform .12s}
 .shop-item:hover{transform:translateY(-6px)}
-.shop-item .title{font-weight:700}
+.shop-item .title{font-weight:800}
 .shop-item .price{color:var(--muted);font-size:13px}
 
-/* Game Over modal */
+/* Game Over */
 .gameover-backdrop{position:fixed;inset:0;background:rgba(8,10,20,0.6);display:none;align-items:center;justify-content:center;z-index:400}
 .gameover-box{background:white;padding:28px;border-radius:12px;text-align:center;box-shadow:0 30px 80px rgba(12,40,80,0.45);transform:scale(.94);opacity:0;transition:all .25s}
 .gameover-box.show{transform:scale(1);opacity:1}
 
-/* small text */
-.small-muted{font-size:12px;color:var(--muted)}
-
-/* utility */
-.row{display:flex;gap:8px;align-items:center}
-input[type="text"], input[type="number"], textarea {padding:8px;border-radius:8px;border:1px solid rgba(12,40,80,0.06);width:100%}
-textarea{min-height:80px}
+input[type="text"], input[type="number"], textarea {padding:10px;border-radius:10px;border:1px solid rgba(12,40,80,0.06);width:100%}
+.hidden{display:none}
 </style>
 </head>
 <body>
@@ -87,17 +98,24 @@ textarea{min-height:80px}
   <header>
     <div class="header-left">
       <div class="logo">G</div>
-      <div><h1>Gubby Clicker</h1><div class="small-muted">Firestore multiplayer — easier to join</div></div>
-    </div>
-    <div class="top-controls">
-      <div id="backpackUI" class="backpack">
-        <div class="bp-item"><div class="bp-qty" id="bpFood">0</div><div class="compact">🍔</div></div>
-        <div class="bp-item"><div class="bp-qty" id="bpWater">0</div><div class="compact">💧</div></div>
-        <div class="bp-item"><div class="bp-qty" id="bpCola">0</div><div class="compact">🥤</div></div>
+      <div>
+        <h1>Gubby Clicker</h1>
+        <div class="small-muted" id="modeTag">Solo</div>
       </div>
-      <div class="small-muted" id="authArea">Not signed in</div>
-      <button id="googleSignIn" class="secondary">Sign in</button>
-      <button id="shopBtn" class="secondary">Shop</button>
+    </div>
+
+    <div class="top-controls" id="topControls">
+      <div class="backpack" id="backpackUI">
+        <div class="bp-item">🍔<div class="bp-qty" id="bpFood">0</div></div>
+        <div class="bp-item">💧<div class="bp-qty" id="bpWater">0</div></div>
+        <div class="bp-item">🥤<div class="bp-qty" id="bpCola">0</div></div>
+      </div>
+
+      <div id="accountArea" style="display:flex;align-items:center;gap:10px">
+        <div id="userInfo" class="small-muted">Not signed in</div>
+        <button id="googleSignIn" class="btn secondary">Sign in</button>
+      </div>
+      <button id="shopBtn" class="btn secondary">Shop</button>
     </div>
   </header>
 
@@ -107,49 +125,60 @@ textarea{min-height:80px}
         <img id="gubbySprite" class="gubby-sprite gubby-float" src="sprites/variants/default.png" style="left:260px;top:210px" draggable="false" />
       </div>
 
-      <div class="hud">
+      <div class="hud" id="hud">
         <div class="stat"><div class="label">HUNGER</div><div class="value" id="hungerVal">0</div><div class="bar"><div id="hungerFill" class="fill" style="width:0%"></div></div></div>
         <div class="stat"><div class="label">THIRST</div><div class="value" id="thirstVal">0</div><div class="bar"><div id="thirstFill" class="fill" style="width:0%"></div></div></div>
         <div class="stat"><div class="label">ENERGY</div><div class="value" id="energyVal">0</div><div class="bar"><div id="energyFill" class="fill" style="width:0%"></div></div></div>
       </div>
 
-      <div class="controls">
-        <button id="feedBtn">Feed</button>
-        <button id="waterBtn" class="secondary">Give Water</button>
-        <button id="colaBtn" class="secondary">Bloxy Cola</button>
-        <button id="playBtn" class="secondary">Play</button>
-        <button id="hostBtn" class="secondary">Host Game</button>
-        <button id="joinBtn" class="secondary">Join Game</button>
+      <div class="controls" role="toolbar" aria-label="Game controls">
+        <button id="feedBtn" class="btn">Feed</button>
+        <button id="waterBtn" class="btn secondary">Give Water</button>
+        <button id="colaBtn" class="btn secondary">Bloxy Cola</button>
+        <button id="playBtn" class="btn secondary">Play</button>
+        <button id="hostBtn" class="btn">Host Game</button>
+        <button id="joinBtn" class="btn secondary">Join Game</button>
       </div>
-      <div class="small-muted">Click Gubby to get clicks. All actions sync to other players in the same room.</div>
+
+      <div class="small-muted">Click Gubby to get clicks. Actions sync to players in the same room.</div>
     </div>
 
     <div class="right-col">
       <div class="panel">
-        <strong>Connection</strong>
-        <div style="margin-top:8px" class="compact">Firestore rooms — Host a room and share its 4-letter code.</div>
-        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-          <div id="connectionStatus" class="compact">Not connected</div>
-          <div id="roomPanel" style="margin-left:auto;display:flex;gap:8px;align-items:center">
-            <div class="compact" id="roomCodeDisplay" style="font-weight:800"></div>
-            <button id="leaveRoomBtn" class="ghost" style="display:none">Leave Room</button>
+        <h4>Connection</h4>
+        <div class="compact" id="connectionDesc">Rooms with Firestore — host a room and share the 4-letter code.</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+          <div style="display:flex;flex-direction:column">
+            <div class="compact">Status</div>
+            <div id="connectionStatus" class="compact" style="font-weight:800;color:var(--muted)">Not connected</div>
           </div>
+          <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <div id="roomCodeDisplay" style="font-weight:900;font-size:18px"></div>
+            <div style="display:flex;gap:8px">
+              <button id="copyRoomBtn" class="btn ghost hidden">Copy</button>
+              <button id="leaveRoomBtn" class="btn ghost hidden">Leave Room</button>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <div class="compact">Members</div>
+          <div id="membersList" class="member-list"></div>
         </div>
       </div>
 
       <div class="panel">
-        <strong>Account</strong>
+        <h4>Account</h4>
         <div id="accountInfo" class="compact" style="margin-top:8px">—</div>
       </div>
 
       <div class="panel">
-        <strong>Variants</strong>
+        <h4>Variants</h4>
         <div id="variantsList" class="variants-list"></div>
       </div>
 
-      <div class="panel admin-panel" id="adminPanel" style="display:none">
-        <strong>Admin</strong>
-        <div style="margin-top:8px" class="compact">
+      <div class="panel admin-panel hidden" id="adminPanel">
+        <h4>Admin</h4>
+        <div class="compact" style="margin-top:8px">
           <label>Variant ID</label><input id="variantId" type="text" placeholder="LavaGubby"><br>
           <label>Display Name</label><input id="variantDisplayName" type="text" placeholder="Lava Gubby"><br>
           <label>File name</label><input id="variantFile" type="text" placeholder="lava.png"><br>
@@ -157,7 +186,7 @@ textarea{min-height:80px}
           <label>Price</label><input id="variantPrice" type="number" value="500"><br>
           <label>Attributes</label>
           <input id="variantAttrs" type="hidden" placeholder='{"clickMultiplier":1.5}'><div id="variantAttrsPreview" class="compact" style="margin-top:6px;color:var(--muted)"></div><br>
-          <div style="display:flex;gap:8px;margin-top:8px"><button id="openAttrPicker" class="secondary">Choose Attributes</button><button id="createVariantBtn">Create Variant</button></div>
+          <div style="display:flex;gap:8px;margin-top:8px"><button id="openAttrPicker" class="btn secondary">Choose Attributes</button><button id="createVariantBtn" class="btn">Create Variant</button></div>
         </div>
       </div>
     </div>
@@ -171,7 +200,7 @@ textarea{min-height:80px}
       <h3 style="margin:0">Shop</h3>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="compact">Clicks: <span id="clicksCounter">0</span></div>
-        <button id="closeShop" class="secondary">Close</button>
+        <button id="closeShop" class="btn secondary">Close</button>
       </div>
     </div>
     <div class="shop-grid" id="shopGrid"></div>
@@ -184,8 +213,8 @@ textarea{min-height:80px}
     <h3 style="margin:0 0 8px 0">Join Game</h3>
     <input id="joinCodeInput" placeholder="Paste 4-letter room code here" maxlength="6"><br>
     <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
-      <button id="joinConfirm" class="secondary">Join</button>
-      <button id="closeJoinModal" class="secondary">Cancel</button>
+      <button id="joinConfirm" class="btn">Join</button>
+      <button id="closeJoinModal" class="btn secondary">Cancel</button>
     </div>
   </div>
 </div>
@@ -200,8 +229,8 @@ textarea{min-height:80px}
       <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-attr="hungerDecay"> Hunger Decay</label><input class="attr-val" type="number" step="0.1" value="1.0">
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
-      <button id="applyAttr" class="secondary">Apply</button>
-      <button id="closeAttrModal" class="secondary">Cancel</button>
+      <button id="applyAttr" class="btn">Apply</button>
+      <button id="closeAttrModal" class="btn secondary">Cancel</button>
     </div>
   </div>
 </div>
@@ -212,8 +241,8 @@ textarea{min-height:80px}
     <h2>Game Over</h2>
     <p class="compact">Gubby has reached 0 in Hunger, Thirst, or Energy.</p>
     <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
-      <button id="restartBtn">Restart For All</button>
-      <button id="closeGameOver" class="secondary">Close</button>
+      <button id="restartBtn" class="btn">Restart For All</button>
+      <button id="closeGameOver" class="btn secondary">Close</button>
     </div>
   </div>
 </div>
@@ -241,7 +270,7 @@ const SOUND_BASE_PATH  = "sounds/"; // merp.mp3 here
 const defaultState = {
   name:'Gubby',
   variant:'default.png',
-  pos:{x:260,y:210},
+  pos:{x:340,y:230},
   hunger:80, thirst:80, energy:100, alive:true,
   clicks:0, totalClicks:0,
   upgrades:{clickPower:1, autoClicks:0, multipliers:[]},
@@ -259,42 +288,41 @@ const hungerVal = document.getElementById('hungerVal'), thirstVal = document.get
 const hungerFill = document.getElementById('hungerFill'), thirstFill = document.getElementById('thirstFill'), energyFill = document.getElementById('energyFill');
 const bpFood = document.getElementById('bpFood'), bpWater = document.getElementById('bpWater'), bpCola = document.getElementById('bpCola');
 const clicksCounter = document.getElementById('clicksCounter');
-const shopModal = document.getElementById('shopModal'), shopBox = document.getElementById('shopBox'), shopGrid = document.getElementById('shopGrid');
 
-const connectionStatus = document.getElementById('connectionStatus');
-const roomCodeDisplay = document.getElementById('roomCodeDisplay');
-const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+const connectionStatus = document.getElementById('connectionStatus'), roomCodeDisplay = document.getElementById('roomCodeDisplay');
+const membersList = document.getElementById('membersList'), copyRoomBtn = document.getElementById('copyRoomBtn'), leaveRoomBtn = document.getElementById('leaveRoomBtn');
+const modeTag = document.getElementById('modeTag'), topControls = document.getElementById('topControls');
 
-/* peer-ish vars for Firestore sync */
+/* multiplayer vars */
 let myPeerId = randomId();
 let localSeq = 0;
-const peerSeq = {}; // track last seq from remote
+const peerSeq = {};
 let currentRoom = null;
 let roomUnsub = null;
+let membersUnsub = null;
 let isHost = false;
 
-/* debounce timer for writes to Firestore */
+/* debounce writes */
 let roomWriteTimer = null;
 const ROOM_WRITE_DEBOUNCE_MS = 600;
 
-/* WebAudio setup for merp with pitch jitter */
+/* audio */
 let audioCtx = null, merpBuffer = null;
 async function loadMerp(){
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
     const res = await fetch(SOUND_BASE_PATH+'merp.mp3');
-    if(!res.ok){ console.warn('merp missing at', SOUND_BASE_PATH+'merp.mp3'); merpBuffer = null; return; }
+    if(!res.ok){ console.warn('merp missing'); merpBuffer = null; return; }
     const ab = await res.arrayBuffer();
     merpBuffer = await audioCtx.decodeAudioData(ab);
   }catch(e){ console.warn('loadMerp fail', e); merpBuffer = null; }
 }
 loadMerp();
-
 function playMerp(){
   if(merpBuffer && audioCtx){
     const src = audioCtx.createBufferSource();
     src.buffer = merpBuffer;
-    const jitter = (Math.random()*0.3) - 0.15; // -0.15 .. +0.15
+    const jitter = (Math.random()*0.3) - 0.15;
     src.playbackRate.value = 1 + jitter;
     src.connect(audioCtx.destination);
     try{ src.start(0); }catch(e){}
@@ -309,9 +337,11 @@ function randomId(){ return Math.random().toString(36).slice(2,9); }
 function saveState(){ state.lastUpdated = Date.now(); localStorage.setItem('gubby_clicker_v1', JSON.stringify(state)); }
 function loadState(){ try{ const raw = localStorage.getItem('gubby_clicker_v1'); if(raw) return JSON.parse(raw);}catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
 
-/* apply UI: sets fills, backpack, sprite, etc */
+/* apply UI */
 function applyUI(){
-  hungerVal.textContent = Math.round(state.hunger); thirstVal.textContent = Math.round(state.thirst); energyVal.textContent = Math.round(state.energy);
+  hungerVal.textContent = Math.round(state.hunger);
+  thirstVal.textContent = Math.round(state.thirst);
+  energyVal.textContent = Math.round(state.energy);
   hungerFill.style.width = Math.max(0, Math.min(100, state.hunger)) + '%';
   thirstFill.style.width = Math.max(0, Math.min(100, state.thirst)) + '%';
   energyFill.style.width = Math.max(0, Math.min(100, state.energy)) + '%';
@@ -319,7 +349,8 @@ function applyUI(){
   clicksCounter.textContent = state.totalClicks; gubbySprite.src = SPRITE_BASE_PATH + state.variant;
   if(state.pos && typeof state.pos.x === 'number') gubbySprite.style.left = state.pos.x + 'px';
   if(state.pos && typeof state.pos.y === 'number') gubbySprite.style.top = state.pos.y + 'px';
-  el('authArea').textContent = user ? (user.displayName || user.email || user.uid) : 'Not signed in';
+  el('accountInfo').textContent = user ? (user.displayName || user.email || user.uid) : 'Not signed in';
+  el('userInfo').textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
 }
 applyUI();
 
@@ -327,7 +358,7 @@ applyUI();
 gubbySprite.style.pointerEvents = 'auto';
 gubbySprite.style.zIndex = 50;
 
-/* ============= Shop modal & UI ============= */
+/* ============= Shop & UI ============= */
 const builtinShop = [
   {id:'click1', title:'Click Power +1', price:200, apply:()=>{ if(state.totalClicks<200) return alert('Not enough clicks'); state.upgrades.clickPower+=1; state.totalClicks-=200; }},
   {id:'auto1', title:'Auto Clicker +1', price:800, apply:()=>{ if(state.totalClicks<800) return alert('Not enough clicks'); state.upgrades.autoClicks+=1; state.totalClicks-=800; }},
@@ -336,15 +367,14 @@ const builtinShop = [
   {id:'colapack', title:'Bloxy Cola +2', price:300, apply:()=>{ if(state.totalClicks<300) return alert('Not enough clicks'); state.backpack.cola+=2; state.totalClicks-=300; }}
 ];
 
-function openShop(items){ shopModal.style.display='flex'; setTimeout(()=>shopBox.classList.add('show'),10); renderShop(items); }
-function closeShop(){ shopBox.classList.remove('show'); setTimeout(()=>shopModal.style.display='none',240); }
-
+function openShop(items){ el('shopModal').style.display='flex'; setTimeout(()=> el('shopBox').classList.add('show'),10); renderShop(items); }
+function closeShop(){ el('shopBox').classList.remove('show'); setTimeout(()=> el('shopModal').style.display='none',240); }
 function renderShop(items){
   shopGrid.innerHTML = '';
   const list = items || builtinShop;
   list.forEach(it=>{
     const div = document.createElement('div'); div.className='shop-item';
-    div.innerHTML = `<div class="title">${it.title}</div><div class="price">Price: ${it.price} clicks</div><div style="margin-top:8px"><button class="buy">Buy</button></div>`;
+    div.innerHTML = `<div class="title">${it.title}</div><div class="price">Price: ${it.price} clicks</div><div style="margin-top:8px"><button class="buy btn">Buy</button></div>`;
     div.querySelector('.buy').addEventListener('click', ()=>{
       if(state.totalClicks < it.price) return alert('Not enough clicks');
       it.apply();
@@ -358,7 +388,7 @@ function renderShop(items){
 el('shopBtn').addEventListener('click', ()=> openShop());
 el('closeShop').addEventListener('click', closeShop);
 
-/* ============= Game & Actions ============= */
+/* ============= Game actions ============= */
 function clickGubbyLocal(){
   if(!state.alive) return;
   if(audioCtx && audioCtx.state === 'suspended'){ audioCtx.resume().catch(()=>{}); }
@@ -386,11 +416,11 @@ el('waterBtn').addEventListener('click', ()=> useBackpack('water'));
 el('colaBtn').addEventListener('click', ()=> useBackpack('cola'));
 el('playBtn').addEventListener('click', ()=> { state.energy = Math.min(100, state.energy + 8); syncLocalAndRoom(); });
 
-/* movement drains energy when wander occurs */
+/* wander */
 function wander(){
   if(!state.alive) return;
-  const margin = 80;
-  const newX = Math.random()*(560 - margin*2) + margin;
+  const margin = 100;
+  const newX = Math.random()*(620 - margin*2) + margin;
   const newY = Math.random()*(360 - margin*2) + margin;
   const dx = (state.pos?.x || newX) - newX;
   const dy = (state.pos?.y || newY) - newY;
@@ -412,21 +442,18 @@ setInterval(()=>{
   const hour = (new Date()).getHours();
   if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2); else state.energy = Math.max(0, state.energy - 0.5);
   if(state.hunger === 0 || state.thirst ===0) state.energy = Math.max(0, state.energy - 2);
-  if(state.upgrades.autoClicks > 0) {
-    addClicks(state.upgrades.autoClicks);
-  }
+  if(state.upgrades.autoClicks > 0) addClicks(state.upgrades.autoClicks);
   if(state.energy <= 0 || state.hunger <= 0 || state.thirst <= 0){
     state.alive = false;
-    syncLocalAndRoom(); // also broadcast game over via room state
+    syncLocalAndRoom();
     showGameOver();
   }
   syncLocalAndRoom();
 }, 10000);
 
-/* add clicks helper */
 function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyUI(); }
 
-/* =========== Game Over modal (sync across players) =========== */
+/* Game over */
 function showGameOver(){
   const backdrop = el('gameOverBackdrop');
   const box = el('gameOverBox');
@@ -446,157 +473,186 @@ el('restartBtn').addEventListener('click', ()=> {
 });
 el('closeGameOver').addEventListener('click', ()=> hideGameOver());
 
-/* ============ Firestore-based rooms (replace P2P) ============ */
-
-/* Initialize firebase (called lazily by initFirebase) */
+/* ============ Firebase setup & auth handling ============ */
 function initFirebase(){
   if(window.firebase && !db){
     firebase.initializeApp(firebaseConfig);
     auth = firebase.auth();
     db = firebase.firestore();
-    // auth state listener
+
     auth.onAuthStateChanged(async u=>{
-      if(u){ user = u;
-        // ensure user doc exists & show admin if admin
+      user = u;
+      if(user){
+        // hide sign-in button and show name
+        el('googleSignIn').style.display = 'none';
+        el('userInfo').textContent = user.displayName || user.email || 'You';
         try{
-          const userRef = db.collection('users').doc(u.uid);
-          const userDoc = await userRef.get();
-          if(!userDoc.exists) await userRef.set({ displayName:u.displayName||u.email||'guest', email:u.email||null, privileges:'normal', createdAt:Date.now() });
+          const userRef = db.collection('users').doc(user.uid);
+          const doc = await userRef.get();
+          if(!doc.exists){
+            await userRef.set({ displayName:user.displayName||user.email||'guest', email:user.email||null, privileges:'normal', createdAt:Date.now() });
+          }
           const profile = (await userRef.get()).data();
-          if(profile?.privileges==='admin') el('adminPanel').style.display='block'; else el('adminPanel').style.display='none';
-        }catch(e){ console.warn('user profile check failed', e); }
-      } else { user = null; el('adminPanel').style.display='none'; }
+          if(profile?.privileges==='admin') { el('adminPanel').classList.remove('hidden'); } else { el('adminPanel').classList.add('hidden'); }
+        }catch(e){ console.warn('user doc check error', e); }
+      } else {
+        // show sign-in
+        el('googleSignIn').style.display = 'inline-block';
+        el('userInfo').textContent = 'Not signed in';
+        el('adminPanel').classList.add('hidden');
+      }
       applyUI();
     });
-    // listen to available variants (same as before)
+
+    // load variants
     db.collection('variants').onSnapshot(snap => renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))));
   }
 }
 
-/* ensure firebase is initialized and sign in anonymously if necessary */
-async function ensureFirebaseAndAuth(){
-  if(!window.firebase) return alert('Firebase SDK missing');
+/* Sign in button */
+el('googleSignIn').addEventListener('click', async ()=>{
+  try{
+    if(!db) initFirebase();
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await firebase.auth().signInWithPopup(provider);
+  }catch(e){ alert('Sign-in failed: '+e.message); }
+});
+
+/* Force sign-in requirement: block host/join if not signed in */
+async function ensureSignedIn(){
   if(!db) initFirebase();
-  if(!auth) return alert('Auth failed');
+  if(!auth) initFirebase();
   if(!auth.currentUser){
-    try{
-      await auth.signInAnonymously();
-    }catch(e){ console.warn('anon sign-in failed', e); alert('Sign-in failed: '+e.message); }
+    alert('Please sign in with Google before hosting or joining a room.');
+    return false;
   }
+  return true;
 }
 
-/* generate short 4-letter room code */
+/* ============ Rooms (rooms/{code} + rooms/{code}/members/{uid}) ============ */
+
+/* generate code */
 function randomRoomCode(){
-  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // drop confusing letters
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   let s = '';
   for(let i=0;i<4;i++) s += letters[Math.floor(Math.random()*letters.length)];
   return s;
 }
 
-/* Host a room: create doc and start listening */
+/* host a room */
 async function hostGame(){
-  try{
-    if(!db) initFirebase();
-    if(!auth) initFirebase();
-    if(!auth.currentUser) await auth.signInAnonymously();
-  }catch(e){}
+  if(!await ensureSignedIn()) return;
   if(currentRoom) return alert('Already in a room. Leave first.');
-  // try to generate a free code (up to N attempts)
+  // attempt to find a free code
   for(let attempt=0; attempt<6; attempt++){
     const code = randomRoomCode();
     const docRef = db.collection('rooms').doc(code);
     const doc = await docRef.get();
     if(!doc.exists){
-      // create initial room doc (host writes authoritative state)
       isHost = true;
       currentRoom = code;
-      const roomData = {
+      const payload = {
         state: state,
+        hostUid: auth.currentUser.uid,
         from: myPeerId,
         seq: ++localSeq,
-        hostUid: auth.currentUser?.uid || null,
         createdAt: Date.now()
       };
-      await docRef.set(roomData);
+      await docRef.set(payload);
+      // add self as member
+      await docRef.collection('members').doc(auth.currentUser.uid).set({
+        uid: auth.currentUser.uid,
+        displayName: auth.currentUser.displayName || auth.currentUser.email || 'You',
+        joinedAt: Date.now()
+      });
       listenToRoom(code);
-      updateConnectionUI(true, code);
-      alert('Room created — code: ' + code + '. Share it with your friends.');
+      listenToMembers(code);
+      updateRoomUI(true, code);
+      alert('Room created — code: ' + code + '. Share it with friends.');
       return;
     }
   }
-  alert('Failed to create a room — try again.');
+  alert('Failed to create a room. Try again.');
 }
 
-/* Join a room by code */
+/* join a room */
 async function joinGame(code){
-  if(!code) return alert('Enter room code');
-  try{
-    if(!db) initFirebase();
-    if(!auth) initFirebase();
-    if(!auth.currentUser) await auth.signInAnonymously();
-  }catch(e){}
+  if(!await ensureSignedIn()) return;
+  if(currentRoom) return alert('Already in a room. Leave first.');
   code = code.trim().toUpperCase();
+  if(!code) return alert('Enter a room code.');
   const docRef = db.collection('rooms').doc(code);
   const doc = await docRef.get();
-  if(!doc.exists) return alert('Room not found: ' + code);
-  // join and listen
-  isHost = false;
+  if(!doc.exists) return alert('Room not found: '+code);
   currentRoom = code;
+  isHost = false;
+  // add member doc
+  await docRef.collection('members').doc(auth.currentUser.uid).set({
+    uid: auth.currentUser.uid,
+    displayName: auth.currentUser.displayName || auth.currentUser.email || 'You',
+    joinedAt: Date.now()
+  });
   listenToRoom(code);
-  updateConnectionUI(true, code);
+  listenToMembers(code);
+  updateRoomUI(true, code);
   alert('Joined room ' + code);
 }
 
-/* Listen to room document and merge incoming states */
+/* listen to room changes (state) */
 function listenToRoom(code){
-  if(roomUnsub) roomUnsub(); roomUnsub = null;
-  const docRef = db.collection('rooms').doc(code);
-  roomUnsub = docRef.onSnapshot(snap => {
+  if(roomUnsub) roomUnsub();
+  roomUnsub = db.collection('rooms').doc(code).onSnapshot(snap=>{
     if(!snap.exists){
-      // room closed
-      showStatus('Room closed');
+      // room removed
+      alert('Room closed');
       leaveRoom(false);
       return;
     }
     const data = snap.data();
     if(!data) return;
-    // if incoming update comes from us, ignore merging (we already applied)
     const seq = Number(data.seq || 0);
     const from = data.from;
-    if(from === myPeerId) {
-      // ignore (our own echo)
-      return;
-    }
-    // simple seq protection
+    if(from === myPeerId) return; // ignore echo
     const prev = peerSeq[from] || 0;
     if(seq <= prev) return;
     peerSeq[from] = seq;
-    // merge remote state
     if(data.state) mergeRemoteState(data.state);
   }, err => {
-    console.warn('Room listen error', err);
-    showStatus('Room listener error');
+    console.warn('room listen error', err);
   });
 }
 
-/* Write local state into room doc (debounced) */
+/* listen to members list */
+function listenToMembers(code){
+  if(membersUnsub) membersUnsub();
+  membersUnsub = db.collection('rooms').doc(code).collection('members').onSnapshot(snap=>{
+    const members = [];
+    snap.forEach(d => {
+      members.push(d.data());
+    });
+    renderMembers(members);
+  }, err => console.warn('members listen err', err));
+}
+
+/* render members */
+function renderMembers(list){
+  membersList.innerHTML = '';
+  list.forEach(m => {
+    const div = document.createElement('div'); div.className = 'member-item';
+    div.innerHTML = `<div style="width:36px;height:36px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-weight:700">${(m.displayName||'U')[0].toUpperCase()}</div>
+                     <div style="display:flex;flex-direction:column"><div style="font-weight:700">${m.displayName||m.uid}</div><div class="compact">joined</div></div>`;
+    membersList.appendChild(div);
+  });
+}
+
+/* schedule room write (debounced) */
 function scheduleRoomWrite(){
   if(!currentRoom) return;
   if(roomWriteTimer) clearTimeout(roomWriteTimer);
   roomWriteTimer = setTimeout(()=> {
-    const docRef = db.collection('rooms').doc(currentRoom);
-    const payload = {
-      state: state,
-      from: myPeerId,
-      seq: ++localSeq,
-      lastUpdated: Date.now()
-    };
-    // write using set merge to avoid clobbering metadata if host added extra fields
-    docRef.set(payload, { merge: true }).catch(e => console.warn('room write failed', e));
+    writeRoomNow();
   }, ROOM_WRITE_DEBOUNCE_MS);
 }
-
-/* immediate write (rarely needed) */
 function writeRoomNow(){
   if(!currentRoom) return;
   const docRef = db.collection('rooms').doc(currentRoom);
@@ -609,55 +665,83 @@ function writeRoomNow(){
   docRef.set(payload, { merge: true }).catch(e => console.warn('room write failed', e));
 }
 
-/* sync local changes to room (called by game actions) */
-function syncLocalAndRoom(){
-  saveState(); applyUI();
-  if(currentRoom) scheduleRoomWrite();
-}
+/* sync helper called by game */
+function syncLocalAndRoom(){ saveState(); applyUI(); if(currentRoom) scheduleRoomWrite(); }
 
-/* Leave room. If host, delete room doc; otherwise just unsubscribe */
+/* leave room */
 async function leaveRoom(userRequested=true){
   if(!currentRoom) return;
   const code = currentRoom;
-  if(roomUnsub) { roomUnsub(); roomUnsub = null; }
-  if(isHost){
-    try{ await db.collection('rooms').doc(code).delete(); }catch(e){ console.warn('Failed to delete room', e); }
-  }
+  try{
+    // remove member doc
+    if(db && auth && auth.currentUser){
+      await db.collection('rooms').doc(code).collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
+      // if host, check if members exist; if none, delete room
+      if(isHost){
+        const membersSnap = await db.collection('rooms').doc(code).collection('members').limit(1).get();
+        if(membersSnap.empty){
+          await db.collection('rooms').doc(code).delete().catch(()=>{});
+        }
+      }
+    }
+  }catch(e){ console.warn('leaveRoom cleanup failed', e); }
+  // unsubscribe
+  if(roomUnsub){ roomUnsub(); roomUnsub = null; }
+  if(membersUnsub){ membersUnsub(); membersUnsub = null; }
   currentRoom = null;
   isHost = false;
+  document.body.classList.remove('multiplayer-mode');
+  modeTag.textContent = 'Solo';
   roomCodeDisplay.textContent = '';
-  leaveRoomBtn.style.display = 'none';
-  showStatus('Not connected');
+  copyRoomBtn.classList.add('hidden');
+  leaveRoomBtn.classList.add('hidden');
+  connectionStatus.textContent = 'Not connected';
+  membersList.innerHTML = '';
   if(userRequested) alert('Left room ' + code);
 }
 
-/* show connection UI */
-function updateConnectionUI(connected, code){
+/* copy room code */
+copyRoomBtn.addEventListener('click', ()=>{
+  const code = currentRoom || roomCodeDisplay.textContent;
+  if(!code) return;
+  navigator.clipboard?.writeText(code).then(()=> alert('Copied'), ()=> alert('Copy failed'));
+});
+
+/* leave button */
+leaveRoomBtn.addEventListener('click', ()=> {
+  if(confirm('Leave room?')) leaveRoom(true);
+});
+
+/* update UI on join/leave */
+function updateRoomUI(connected, code){
   if(connected){
-    showStatus('Connected');
+    document.body.classList.add('multiplayer-mode');
+    modeTag.textContent = 'In Room';
+    connectionStatus.textContent = 'Connected';
     roomCodeDisplay.textContent = code || '';
-    leaveRoomBtn.style.display = 'inline-block';
+    copyRoomBtn.classList.remove('hidden');
+    leaveRoomBtn.classList.remove('hidden');
   } else {
-    showStatus('Not connected');
+    document.body.classList.remove('multiplayer-mode');
+    modeTag.textContent = 'Solo';
+    connectionStatus.textContent = 'Not connected';
     roomCodeDisplay.textContent = '';
-    leaveRoomBtn.style.display = 'none';
+    copyRoomBtn.classList.add('hidden');
+    leaveRoomBtn.classList.add('hidden');
   }
 }
 
-/* =========== Remote actions handling (same merge/apply logic) =========== */
+/* =========== merging/applying remote state (same as before) =========== */
 function mergeRemoteState(remote){
   if(!remote) return;
-  // prefer highest totalClicks
   if(remote.totalClicks > state.totalClicks){
     state.totalClicks = remote.totalClicks;
     state.upgrades = remote.upgrades || state.upgrades;
     state.variant = remote.variant || state.variant;
   }
-  // backpack: take max (simple merge strategy)
   state.backpack.food = Math.max(state.backpack.food, remote.backpack?.food || 0);
   state.backpack.water = Math.max(state.backpack.water, remote.backpack?.water || 0);
   state.backpack.cola = Math.max(state.backpack.cola, remote.backpack?.cola || 0);
-  // average bars
   state.hunger = Math.round((state.hunger + (remote.hunger||state.hunger))/2);
   state.thirst = Math.round((state.thirst + (remote.thirst||state.thirst))/2);
   state.energy = Math.round((state.energy + (remote.energy||state.energy))/2);
@@ -669,17 +753,13 @@ function applyRemoteAction(action){
   if(action.type === 'click'){ addClicks(action.value || 1); playMerp(); }
   if(action.type === 'move'){ state.pos.x = action.x; state.pos.y = action.y; state.energy = Math.max(0, state.energy - (action.energyLoss||1)); gubbySprite.style.left = state.pos.x + 'px'; gubbySprite.style.top = state.pos.y + 'px'; }
   if(action.type === 'use_item'){ if(action.item && state.backpack[action.item] !== undefined){ if(typeof action.count === 'number') state.backpack[action.item] = action.count; else state.backpack[action.item] = Math.max(0, (state.backpack[action.item]||0) -1); } }
-  if(action.type === 'purchase'){ /* optionally reflect purchase - we rely on state.totalClicks merging and shop logic */ }
   if(action.type === 'auto_click'){ addClicks(action.value || 1); }
   if(action.type === 'play'){ state.energy = Math.min(100, state.energy + 8); }
   saveState(); applyUI();
   if(!state.alive && (state.hunger <=0 || state.thirst<=0 || state.energy<=0)) showGameOver();
 }
 
-/* =========== Firebase admin wiring (variants / users) =========== */
-el('googleSignIn').addEventListener('click', ()=> { if(!db) initFirebase(); if(!auth) initFirebase(); if(!auth) return alert('Firebase init failed'); const provider = new firebase.auth.GoogleAuthProvider(); auth.signInWithPopup(provider).catch(e=>alert('Sign in failed: '+e.message)); });
-
-/* admin create variant */
+/* =========== Admin variants & Firebase wiring =========== */
 el('createVariantBtn')?.addEventListener('click', async ()=>{
   if(!db || !auth || !auth.currentUser) return alert('Sign-in required');
   const id = el('variantId').value.trim(), file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0;
@@ -692,26 +772,17 @@ el('createVariantBtn')?.addEventListener('click', async ()=>{
   try{ await db.collection('variants').add({ id, displayName: el('variantDisplayName').value || id, fileName:file, price, attributes:attrs, createdBy:auth.currentUser.uid, createdAt:Date.now() }); await db.collection('shop').add({ type:'variant', variantFile:file, variantId:id, price, attributes:attrs }); alert('Created'); }catch(e){ alert('Error: '+e.message); }
 });
 
-/* render firestore variants */
+/* render variants */
 function renderVariantsFromFirestore(items){
   const wrap = el('variantsList'); wrap.innerHTML = '';
-  items.forEach(v=>{ const d = document.createElement('div'); d.className='variant-item'; d.textContent = `${v.displayName || v.id} — ${v.fileName}${v.price? ' — '+v.price:''}`; d.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndRoom(); }); wrap.appendChild(d); });
+  items.forEach(v=>{ const d = document.createElement('div'); d.className='variant-item'; d.textContent = `${v.displayName || v.id} — ${v.fileName}${v.price? ' — '+v.price:''}`; d.addEventListener('click', ()=>{ state.variant = v.fileName; syncLocalAndRoom(); applyUI(); }); wrap.appendChild(d); });
 }
 
-/* =========== Sync & save helper =========== */
-function syncLocalAndPeers(){ saveState(); applyUI(); /* legacy name: no-op now */ }
-function syncLocalAndRoom(){ saveState(); applyUI(); if(currentRoom) scheduleRoomWrite(); }
-
-/* expose debug */
-window.GubbyClicker = { state, saveState, loadState, openShop, hostGame, joinGame, leaveRoom };
-
-/* ============== UI: host/join modals and attr picker wiring ============== */
+/* =========== UI wiring: host/join modals & attr picker & sprite preview =========== */
 el('hostBtn').addEventListener('click', async ()=> {
-  try{
-    if(!db) initFirebase();
-    if(!auth) initFirebase();
-    if(!auth.currentUser) await auth.signInAnonymously();
-  }catch(e){}
+  if(!db) initFirebase();
+  if(!auth) initFirebase();
+  try{ if(!auth.currentUser) await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){ /* ignore; ensureSignedIn will alert */ }
   hostGame();
 });
 
@@ -726,16 +797,12 @@ el('joinConfirm').addEventListener('click', ()=> {
   el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none', 240);
 });
 
-/* Leave room button */
-leaveRoomBtn.addEventListener('click', ()=> { if(confirm('Leave room?')) leaveRoom(true); });
-
-/* Attribute picker */
+/* attr picker */
 el('openAttrPicker').addEventListener('click', ()=> {
   el('attrModal').style.display='flex';
   setTimeout(()=> el('attrBox').classList.add('show'), 10);
 });
 el('closeAttrModal').addEventListener('click', ()=> { el('attrBox').classList.remove('show'); setTimeout(()=> el('attrModal').style.display='none', 220); });
-
 el('applyAttr').addEventListener('click', ()=> {
   const checkboxes = el('attrBox').querySelectorAll('input[type="checkbox"][data-attr]');
   const vals = el('attrBox').querySelectorAll('.attr-val');
@@ -753,7 +820,7 @@ el('applyAttr').addEventListener('click', ()=> {
   el('attrBox').classList.remove('show'); setTimeout(()=> el('attrModal').style.display='none', 220);
 });
 
-/* sprite preview for admin */
+/* sprite preview */
 el('variantFile')?.addEventListener('input', (ev)=> {
   const v = ev.target.value.trim();
   if(!v){ el('variantPreview').style.display='none'; el('variantPreview').src=''; return; }
@@ -763,11 +830,30 @@ el('variantFile')?.addEventListener('input', (ev)=> {
   el('variantPreview').onerror = ()=> { el('variantPreview').style.display='none'; };
 });
 
-/* helper to update connection status */
-function showStatus(s){ connectionStatus.textContent = s; }
+/* helpers */
+function syncLocalAndRoom(){ saveState(); applyUI(); if(currentRoom) scheduleRoomWrite(); }
+function syncLocalAndPeers(){ saveState(); applyUI(); } // legacy
 
-/* finished wiring UI */
+/* expose debug */
+window.GubbyClicker = { state, saveState, loadState, openShop, hostGame, joinGame, leaveRoom };
 
+/* cleanup on unload: remove member doc */
+window.addEventListener('beforeunload', async ()=> {
+  try{
+    if(currentRoom && db && auth && auth.currentUser){
+      await db.collection('rooms').doc(currentRoom).collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
+      if(isHost){
+        const membersSnap = await db.collection('rooms').doc(currentRoom).collection('members').limit(1).get();
+        if(membersSnap.empty){
+          await db.collection('rooms').doc(currentRoom).delete().catch(()=>{});
+        }
+      }
+    }
+  }catch(e){}
+});
+
+/* initial firebase init (lazy) */
+initFirebase();
 </script>
 </body>
 </html>
