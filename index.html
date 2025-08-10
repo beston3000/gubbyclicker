@@ -1,402 +1,759 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gubby House — Full Game</title>
-  <!--
-  IMPORTANT: Firestore Security Rules (PUT THESE IN FIREBASE CONSOLE -> Firestore -> Rules)
-  ---------------------------------------------------------------------------
-  The following rules assume you have collections: "users", "rooms", "variants", and "shop".
-  - users documents: userId -> { displayName, email, privileges }
-  - rooms documents: roomCode -> { state, updatedAt }
-  - variants documents: auto-generated or ID -> { id, fileName, price, attributes, createdBy }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raise a Gubby</title>
+    <!-- 
+    A NOTE ON FIRESTORE RULES
+    These rules are essential for security and functionality.
+    - They allow anyone to read/write to the 'rooms' collection, which is necessary for multiplayer.
+    - They ensure that only logged-in users can create a user document for themselves.
+    - A user can only update their own document.
+    - The 'variants' collection is read-only for all users, so they can't cheat and change upgrade prices.
+      Only you (from the server/console) or an admin (if you build that rule) should write to it.
+      For the admin panel to work, we are adding a rule that allows users with the 'admin' privilege to write to the variants collection.
 
-  Replace <YOUR_PROJECT_ID> where appropriate if you use any explicit references.
+    THE RULES HAVE BEEN PROVIDED IN A SEPARATE DOCUMENT. PLEASE COPY THEM INTO YOUR FIRESTORE RULES EDITOR.
+    -->
+    <style>
+        :root {
+            --bg-color: #2c2f33;
+            --secondary-bg: #23272a;
+            --primary-text: #ffffff;
+            --accent-color: #7289da;
+            --accent-hover: #677bc4;
+            --danger-color: #f04747;
+            --success-color: #43b581;
+            --warning-color: #faa61a;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --border-radius: 8px;
+        }
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--primary-text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #app-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* --- AUTH & ROOMS --- */
+        .screen {
+            background-color: var(--secondary-bg);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 400px;
+            text-align: center;
+        }
+        .screen h1 { margin-top: 0; }
+        .form-group { margin-bottom: 20px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold;}
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: var(--bg-color);
+            border: 1px solid #444;
+            border-radius: var(--border-radius);
+            color: var(--primary-text);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--accent-color);
+            border: none;
+            border-radius: var(--border-radius);
+            color: var(--primary-text);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: var(--accent-hover); }
+        .toggle-link { margin-top: 20px; color: var(--accent-color); cursor: pointer; }
+        .error-message { color: var(--danger-color); margin-top: 15px; min-height: 20px;}
+        .divider {
+            display: flex; align-items: center; text-align: center; margin: 20px 0;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; border-bottom: 1px solid #444;
+        }
+        .divider:not(:empty)::before { margin-right: .25em; }
+        .divider:not(:empty)::after { margin-left: .25em; }
 
-  RULES (example, copy-paste into Firestore rules editor):
+        /* --- GAME SCREEN --- */
+        #game-screen {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        #game-canvas {
+            background-color: #3a3f44;
+            flex-grow: 1;
+        }
+        #hud {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+            background-color: var(--secondary-bg);
+            flex-wrap: wrap;
+        }
+        .stat { display: flex; align-items: center; font-size: 1.2em; }
+        .stat span { margin-left: 8px; }
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+            background-color: var(--secondary-bg);
+        }
+        #controls button { width: auto; padding: 10px 20px;}
+        #admin-panel-btn { background-color: var(--warning-color); }
+        #logout-btn { background-color: var(--danger-color); }
+        #day-night-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000030;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 2s ease-in-out;
+        }
 
-  rules_version = '2';
-  service cloud.firestore {
-    match /databases/{database}/documents {
+        /* --- MODALS --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: var(--secondary-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            width: 80%;
+            max-width: 600px;
+            position: relative;
+        }
+        .close-btn {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .shop-grid, .admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .shop-item {
+            background-color: var(--bg-color);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .shop-item img {
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+            margin: 0 auto 10px auto;
+        }
+        .shop-item button { width: 100%; font-size: 14px; padding: 8px;}
 
-      // Users: a user can read their own profile and write some fields on signup only.
-      match /users/{userId} {
-        allow create: if request.auth != null && request.auth.uid == userId;
-        allow read: if request.auth != null && request.auth.uid == userId;
-        // only admins can update privileges field
-        allow update: if request.auth != null && (
-          // user can update their own non-privileges fields
-          (request.auth.uid == userId && !("privileges" in request.resource.data))
-          ||
-          // admins can update anything
-          (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin')
-        );
-      }
-
-      // Variants: admins create/update/delete; everyone can read
-      match /variants/{variantId} {
-        allow read: if true;
-        allow create, update, delete: if request.auth != null &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin';
-      }
-
-      // Rooms (multiplayer state). Users in the room may update the room state but we keep it permissive
-      match /rooms/{roomId} {
-        allow read: if true; // allow read so friends can join
-        allow create: if request.auth != null;
-        allow update: if request.auth != null; // you can implement stricter checks if desired
-      }
-
-      // Shop: admins can add items, read allowed to all
-      match /shop/{shopId} {
-        allow read: if true;
-        allow create, update, delete: if request.auth != null &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin';
-      }
-
-      // Fallback deny
-      match /{document=**} { allow read, write: if false; }
-    }
-  }
-
-  NOTES:
-  - By default, new users should be written to /users/{uid} with privileges: 'normal'. You can edit privileges manually in the Firebase Console to 'admin'.
-  - The app attempts basic client-side checks for admin UI but relies on the Firestore rules above for true enforcement.
-  - Files referenced for sprites must be hosted in your GitHub repo under /sprites/variants/*.png and served by your web host.
-
-  -->
-  <style>
-    :root{--bg:#f3f7fb;--card:#fff;--accent:#6b8cff}
-    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
-    body{margin:0;min-height:100vh;background:linear-gradient(#e6f3ff,#f7fbff);display:flex;align-items:center;justify-content:center;padding:18px}
-    .app{width:100%;max-width:1200px;background:var(--card);border-radius:12px;box-shadow:0 14px 40px rgba(10,10,30,0.12);overflow:hidden}
-    header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #eef3ff}
-    header h1{margin:0;font-size:18px}
-    .main{display:grid;grid-template-columns:560px 1fr;gap:12px;padding:18px}
-    .left{background:#f8fbff;border-radius:10px;padding:12px}
-    .right{padding:12px}
-    .house{width:520px;height:420px;background-image:linear-gradient(#fff,#def);border-radius:8px;position:relative;overflow:hidden;border:2px solid #e6f2ff}
-    .gubby-sprite{position:absolute;transform:translate(-50%,-50%);width:96px;height:96px;transition:left .5s linear, top .5s linear, transform .2s}
-    .hud{display:flex;gap:8px;margin-top:8px}
-    .stat{background:white;padding:8px;border-radius:8px;border:1px solid #eef4ff;flex:1}
-    .stat strong{display:block}
-    .controls{display:flex;gap:8px;margin-top:8px}
-    button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer}
-    button.secondary{background:#eef3ff;color:#164ea6}
-    .panel{background:#fff;padding:10px;border-radius:8px;border:1px solid #eef4ff;margin-bottom:12px}
-    label{font-size:13px;color:#444}
-    input[type=text], input[type=password], input[type=number], select{width:100%;padding:8px;margin-top:6px;border-radius:8px;border:1px solid #e6eef9}
-    .small{font-size:12px;color:#667}
-    .variants-list{display:flex;gap:8px;flex-wrap:wrap}
-    .variant-pill{padding:6px 8px;border-radius:8px;border:1px solid #e6eef9;background:white}
-    .admin-panel{display:none;border-top:1px dashed #e6eef9;padding-top:8px;margin-top:8px}
-    .visible{display:block}
-    .muted{color:#667;font-size:13px}
-    .row{display:flex;gap:8px;align-items:center}
-    footer{padding:12px;border-top:1px solid #f0f6ff;text-align:center;font-size:12px;color:#666}
-  </style>
+        /* --- GUBBY INFO --- */
+        #gubby-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 15px;
+            border-radius: var(--border-radius);
+        }
+        
+        .hidden { display: none !important; }
+    </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <h1>Gubby House</h1>
-      <div style="margin-left:auto" id="authArea" class="muted small">Not signed in</div>
-    </header>
-    <div class="main">
-      <div class="left">
-        <div class="house" id="house">
-          <!-- background house image could go here -->
-          <img id="gubbySprite" class="gubby-sprite" src="/sprites/variants/default.png" style="left:50%;top:60%" draggable="false" />
-        </div>
 
-        <div class="hud">
-          <div class="stat"><strong>Hunger <span id="hungerVal">0</span>%</strong><div class="small" id="hungerBar">—</div></div>
-          <div class="stat"><strong>Thirst <span id="thirstVal">0</span>%</strong><div class="small" id="thirstBar">—</div></div>
-          <div class="stat"><strong>Energy <span id="energyVal">0</span>%</strong><div class="small" id="energyBar">—</div></div>
-        </div>
+    <div id="app-container">
 
-        <div class="controls">
-          <button id="feedBtn">Feed</button>
-          <button id="waterBtn" class="secondary">Give Water</button>
-          <button id="colaBtn">Give Bloxy Cola</button>
-          <button id="playBtn" class="secondary">Play (increase happiness)</button>
-        </div>
-
-      </div>
-
-      <div class="right">
-        <div class="panel">
-          <label>Account</label>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <input type="text" id="email" placeholder="email" />
-            <input type="password" id="password" placeholder="password" />
-          </div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button id="signupBtn">Sign up</button>
-            <button id="signinBtn" class="secondary">Sign in</button>
-            <button id="signoutBtn" class="secondary" style="display:none">Sign out</button>
-          </div>
-          <div id="accountInfo" class="muted small" style="margin-top:8px">—</div>
-        </div>
-
-        <div class="panel">
-          <label>Shop & Upgrades</label>
-          <div id="shopList" style="margin-top:8px"></div>
-        </div>
-
-        <div class="panel">
-          <label>Variants</label>
-          <div class="variants-list" id="variantsList"></div>
-        </div>
-
-        <div class="panel admin-panel" id="adminPanel">
-          <label>Admin Panel — Create Variant / Shop Item</label>
-          <div style="margin-top:8px">
-            <label>Variant ID</label>
-            <input type="text" id="variantId" placeholder="e.g. LavaGubby" />
-            <label style="margin-top:6px">File name (inside /sprites/variants/)</label>
-            <input type="text" id="variantFile" placeholder="e.g. lava.png" />
-            <label style="margin-top:6px">Price (clicks)</label>
-            <input type="number" id="variantPrice" value="500" />
-            <label style="margin-top:6px">Attributes (json) — e.g. {"clickMultiplier":2,"energyBonus":10}</label>
-            <input type="text" id="variantAttrs" placeholder='{"clickMultiplier":2,"energyBonus":10}' />
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button id="createVariantBtn">Create Variant</button>
-              <button id="refreshVariants" class="secondary">Refresh</button>
+        <!-- AUTHENTICATION & ROOM SELECTION SCREEN -->
+        <div id="auth-container" class="screen">
+            <!-- Login Form -->
+            <div id="login-form">
+                <h1>Welcome Back!</h1>
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button id="login-btn">Login</button>
+                <div class="error-message" id="login-error"></div>
+                <p class="toggle-link" onclick="toggleAuthForms()">Need an account? Sign Up</p>
             </div>
-            <div class="muted small" style="margin-top:8px">Admin-only: creating a variant will add a shop upgrade. The client will use /sprites/variants/{fileName} for the image — make sure the file exists in your GitHub repo served at that path.</div>
-          </div>
+
+            <!-- Signup Form -->
+            <div id="signup-form" class="hidden">
+                <h1>Create Account</h1>
+                <div class="form-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" required>
+                </div>
+                <button id="signup-btn">Sign Up</button>
+                <div class="error-message" id="signup-error"></div>
+                <p class="toggle-link" onclick="toggleAuthForms()">Already have an account? Login</p>
+            </div>
+            
+            <!-- Room Selection (shown after login) -->
+            <div id="room-selection" class="hidden">
+                <h1>Join a Room</h1>
+                <div class="form-group">
+                    <label for="room-code-input">Enter Room Code</label>
+                    <input type="text" id="room-code-input" placeholder="e.g., ABCDE">
+                </div>
+                <button id="join-room-btn">Join Room</button>
+                <div class="divider">OR</div>
+                <button id="create-room-btn">Create a New Room</button>
+                <div class="error-message" id="room-error"></div>
+            </div>
         </div>
 
-      </div>
+        <!-- MAIN GAME SCREEN -->
+        <div id="game-screen" class="hidden">
+            <div id="gubby-info">
+                <h2 id="gubby-name-display">Gubby</h2>
+                <p>Room Code: <b id="room-code-display"></b></p>
+            </div>
+            <div id="day-night-overlay"></div>
+            <canvas id="game-canvas"></canvas>
+            <div id="hud">
+                <div class="stat">💰 <span id="money-stat">0</span></div>
+                <div class="stat">🍔 <span id="hunger-stat">100</span>%</div>
+                <div class="stat">💧 <span id="thirst-stat">100</span>%</div>
+                <div class="stat">⚡ <span id="energy-stat">100</span>%</div>
+            </div>
+            <div id="controls">
+                <button id="feed-btn">Feed (Cost: 10)</button>
+                <button id="water-btn">Water (Cost: 5)</button>
+                <button id="shop-btn">Shop</button>
+                <button id="admin-panel-btn" class="hidden">Admin Panel</button>
+                <button id="logout-btn">Logout</button>
+            </div>
+        </div>
     </div>
-    <footer>Tip: Host this repo on GitHub Pages (or similar) so /sprites/variants/* are served. Replace firebaseConfig in the script with your project's values.</footer>
-  </div>
 
-<script>
-// ================== CONFIG ==================
-// Paste your Firebase config here (replace empty object) to enable auth & Firestore.
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
-  authDomain: "gubby-clicker.firebaseapp.com",
-  projectId: "gubby-clicker",
-  storageBucket: "gubby-clicker.firebasestorage.app",
-  messagingSenderId: "255072290621",
-  appId: "1:255072290621:web:9f80676beac50c0059a754",
-  measurementId: "G-R3HFMPH5C4"
-};
-// ==================================================
+    <!-- MODALS -->
+    <div id="name-modal" class="modal">
+        <div class="modal-content">
+            <h2>Name Your Gubby!</h2>
+            <div class="form-group">
+                <label for="gubby-name-input">Gubby's Name</label>
+                <input type="text" id="gubby-name-input" maxlength="20">
+            </div>
+            <button id="save-name-btn">Save Name</button>
+        </div>
+    </div>
 
-// Quick helpers
-function el(id){return document.getElementById(id)}
+    <div id="shop-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('shop-modal')">&times;</span>
+            <h2>Shop</h2>
+            <h3>Upgrades</h3>
+            <div id="upgrades-grid" class="shop-grid">
+                <!-- Upgrades will be populated by JS -->
+            </div>
+            <h3>Gubby Variants</h3>
+            <div id="variants-grid" class="shop-grid">
+                <!-- Variants will be populated by JS -->
+            </div>
+        </div>
+    </div>
+    
+    <div id="admin-panel-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('admin-panel-modal')">&times;</span>
+            <h2>Admin Panel: Add Gubby Variant</h2>
+            <div class="form-group">
+                <label for="variant-name">Variant Name (e.g., Water Gubby)</label>
+                <input type="text" id="variant-name">
+            </div>
+            <div class="form-group">
+                <label for="variant-filename">Sprite Filename (e.g., water.png)</label>
+                <input type="text" id="variant-filename" placeholder="Must be in sprites/variants/">
+            </div>
+            <div class="form-group">
+                <label for="variant-price">Price</label>
+                <input type="number" id="variant-price" value="1000">
+            </div>
+            <div class="form-group">
+                <label for="variant-multiplier">Click Multiplier</label>
+                <input type="number" id="variant-multiplier" value="1.5" step="0.1">
+            </div>
+             <div class="form-group">
+                <label for="variant-description">Description (e.g., Resists thirst)</label>
+                <input type="text" id="variant-description">
+            </div>
+            <button id="add-variant-btn">Add Variant</button>
+            <div class="error-message" id="admin-error"></div>
+        </div>
+    </div>
 
-// Game state
-const defaultState = {
-  name: 'Gubby',
-  variant: 'default.png',
-  pos:{x:260,y:210},
-  hunger:80, thirst:80, energy:100, alive:true,
-  clicks:0, totalClicks:0,
-  upgrades:{clickPower:1, autoClicks:0, multipliers:[]}
-};
-let state = loadState();
-let user = null;
-let db = null;
-let auth = null;
 
-// UI refs
-const gubbySprite = el('gubbySprite');
-const hungerVal = el('hungerVal'), thirstVal = el('thirstVal'), energyVal = el('energyVal');
-const feedBtn = el('feedBtn'), waterBtn = el('waterBtn'), colaBtn = el('colaBtn'), playBtn = el('playBtn');
-const shopList = el('shopList'), variantsList = el('variantsList');
-const adminPanel = el('adminPanel');
-const authArea = el('authArea');
-const accountInfo = el('accountInfo');
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, increment, serverTimestamp, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-// Initialize
-applyStateToUI();
-renderShop();
-renderVariantsClientSide();
+        // 1. --- YOUR FIREBASE CONFIGURATION ---
+        // This has been updated with the config you provided.
+        const firebaseConfig = {
+            apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
+            authDomain: "gubby-clicker.firebaseapp.com",
+            projectId: "gubby-clicker",
+            storageBucket: "gubby-clicker.appspot.com",
+            messagingSenderId: "255072290621",
+            appId: "1:255072290621:web:9f80676beac50c0059a754",
+            measurementId: "G-R3HFMPH5C4"
+        };
 
-// Movement: simple autonomous wandering inside house bounds
-const houseRect = {w:520,h:420};
-function wander(){ if(!state.alive) return; // pick a new random position
-  const margin = 48;
-  const x = Math.random()*(houseRect.w - margin*2) + margin;
-  const y = Math.random()*(houseRect.h - margin*2) + margin;
-  state.pos.x = x; state.pos.y = y;
-  gubbySprite.style.left = x + 'px'; gubbySprite.style.top = y + 'px';
-}
-setInterval(wander, 3000);
+        // 2. --- INITIALIZE FIREBASE & GET SERVICES ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-// Clicking gubby
-gubbySprite.addEventListener('click', ()=>{
-  if(!state.alive) return; const power = state.upgrades.clickPower * (getMultiplier());
-  addClicks(power);
-  state.energy = Math.max(0, state.energy - 1);
-  state.hunger = Math.max(0, state.hunger - 0.5);
-  state.thirst = Math.max(0, state.thirst - 0.7);
-  applyStateToUI();
-  saveState();
-  if(db) syncRoom();
-});
+        // 3. --- DOM ELEMENT REFERENCES ---
+        const authContainer = document.getElementById('auth-container');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const roomSelection = document.getElementById('room-selection');
+        const gameScreen = document.getElementById('game-screen');
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
 
-// Buttons
-feedBtn.addEventListener('click', ()=>{ if(!state.alive) return; state.hunger = Math.min(100, state.hunger + 25); applyStateToUI(); saveState(); if(db) syncRoom(); });
-waterBtn.addEventListener('click', ()=>{ if(!state.alive) return; state.thirst = Math.min(100, state.thirst + 25); applyStateToUI(); saveState(); if(db) syncRoom(); });
-colaBtn.addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100, state.energy + 50); applyStateToUI(); saveState(); if(db) syncRoom(); });
-playBtn.addEventListener('click', ()=>{ if(!state.alive) return; state.energy = Math.min(100, state.energy + 10); addClicks(5); applyStateToUI(); saveState(); if(db) syncRoom(); });
+        // Buttons
+        const loginBtn = document.getElementById('login-btn');
+        const signupBtn = document.getElementById('signup-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const createRoomBtn = document.getElementById('create-room-btn');
+        const joinRoomBtn = document.getElementById('join-room-btn');
+        const shopBtn = document.getElementById('shop-btn');
+        const adminBtn = document.getElementById('admin-panel-btn');
+        const addVariantBtn = document.getElementById('add-variant-btn');
 
-// Decay loop
-setInterval(()=>{
-  if(!state.alive) return;
-  state.hunger = Math.max(0, state.hunger - 1);
-  state.thirst = Math.max(0, state.thirst - 1.2);
-  // energy decreases during day, regain when sleeping (simple day cycle)
-  const hour = (new Date()).getHours();
-  if(hour>=22 || hour<7) state.energy = Math.min(100, state.energy + 2);
-  else state.energy = Math.max(0, state.energy - 0.5);
-  if(state.hunger===0 || state.thirst===0) state.energy = Math.max(0, state.energy - 2);
-  if(state.energy===0){ state.alive=false; gubbySprite.src='/sprites/variants/dead.png'; }
-  applyStateToUI(); saveState(); if(db) syncRoom();
-}, 10000);
+        // Stats
+        const moneyStat = document.getElementById('money-stat');
+        const hungerStat = document.getElementById('hunger-stat');
+        const thirstStat = document.getElementById('thirst-stat');
+        const energyStat = document.getElementById('energy-stat');
+        const gubbyNameDisplay = document.getElementById('gubby-name-display');
+        const roomCodeDisplay = document.getElementById('room-code-display');
+        
+        // Modals
+        const nameModal = document.getElementById('name-modal');
+        const shopModal = document.getElementById('shop-modal');
+        const adminModal = document.getElementById('admin-panel-modal');
 
-// Auto clickers
-setInterval(()=>{ if(state.upgrades.autoClicks>0 && state.alive){ addClicks(state.upgrades.autoClicks); saveState(); if(db) syncRoom(); } }, 2000);
+        // 4. --- GAME STATE & CONSTANTS ---
+        let currentUser = null;
+        let currentRoomId = null;
+        let unsubscribeFromRoom = null; // To stop listening to room updates on logout
+        let gubby = {
+            x: 100, y: 100,
+            width: 128, height: 128,
+            vx: 1, vy: 1,
+            img: new Image(),
+            isSleeping: false,
+            isDead: false
+        };
+        gubby.img.src = 'sprites/variants/default.png'; // Default sprite
 
-function addClicks(n){ state.clicks += n; state.totalClicks += n; }
-function getMultiplier(){ let m=1; if(state.upgrades.multipliers){ state.upgrades.multipliers.forEach(v=>m*=v); } return m; }
+        const GAME_TICK_RATE = 2000; // Deplete stats every 2 seconds
+        const DAY_NIGHT_DURATION = 60000; // 1 minute day, 1 minute night
+        let lastTickTime = 0;
+        let timeOfDay = 0; // 0 to DAY_NIGHT_DURATION*2
+        let isDay = true;
+        let gameLoopId = null; // To store the requestAnimationFrame ID
 
-function applyStateToUI(){ hungerVal.textContent = Math.round(state.hunger); thirstVal.textContent = Math.round(state.thirst); energyVal.textContent = Math.round(state.energy);
-  gubbySprite.src = `/sprites/variants/${state.variant}`;
-}
+        // --- HELPER FUNCTIONS ---
+        window.toggleAuthForms = function() {
+            loginForm.classList.toggle('hidden');
+            signupForm.classList.toggle('hidden');
+        }
+        window.openModal = function(modalId) { document.getElementById(modalId).style.display = 'flex'; }
+        window.closeModal = function(modalId) { document.getElementById(modalId).style.display = 'none'; }
+        
+        function generateRoomCode() {
+            return Math.random().toString(36).substring(2, 7).toUpperCase();
+        }
 
-function saveState(){ localStorage.setItem('gubby_full_v1', JSON.stringify(state)); }
-function loadState(){ try{ const raw = localStorage.getItem('gubby_full_v1'); if(raw) return JSON.parse(raw); }catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
+        // 5. --- AUTHENTICATION LOGIC ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                authContainer.classList.add('hidden');
+                roomSelection.classList.remove('hidden');
+                gameScreen.classList.add('hidden'); // Hide game until room is joined
+                
+                await checkAdminStatus(user.uid);
+            } else {
+                currentUser = null;
+                authContainer.classList.remove('hidden');
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                roomSelection.classList.add('hidden');
+                gameScreen.classList.add('hidden');
+                if (unsubscribeFromRoom) unsubscribeFromRoom();
+                if(gameLoopId) cancelAnimationFrame(gameLoopId);
+            }
+        });
 
-// ---------------- Firebase: Auth + Firestore integration ----------------
-async function enableFirebase(){ if(Object.keys(firebaseConfig).length===0) return;
-  // load compat SDKs for quick integration
-  await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-  await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js');
-  await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
-  // initialize
-  firebase.initializeApp(firebaseConfig);
-  auth = firebase.auth();
-  db = firebase.firestore();
+        loginBtn.addEventListener('click', () => {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(err => document.getElementById('login-error').textContent = err.message);
+        });
 
-  // Auth state
-  auth.onAuthStateChanged(async u=>{
-    if(u){ user = u; authArea.textContent = `Signed in: ${u.email}`; el('signinBtn').style.display='none'; el('signupBtn').style.display='none'; el('signoutBtn').style.display='inline-block';
-      // ensure user doc exists with privileges: 'normal'
-      const userRef = db.collection('users').doc(u.uid);
-      const doc = await userRef.get();
-      if(!doc.exists){ await userRef.set({displayName:u.email.split('@')[0], email:u.email, privileges:'normal'}); }
-      const profile = (await userRef.get()).data();
-      accountInfo.textContent = `Privileges: ${profile.privileges}`;
-      // if admin show admin panel
-      if(profile.privileges === 'admin'){ adminPanel.classList.add('visible'); }
-      else adminPanel.classList.remove('visible');
-      // sync user-specific gubby state (optional)
-      const myDoc = db.collection('rooms').doc('user_'+u.uid);
-      // attempt to load remote state
-      const r = await myDoc.get(); if(r.exists){ const remote = r.data().state; if(remote) { state = Object.assign(state, remote); applyStateToUI(); saveState(); } }
+        signupBtn.addEventListener('click', () => {
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            createUserWithEmailAndPassword(auth, email, password)
+                .then(userCredential => {
+                    const userDocRef = doc(db, "users", userCredential.user.uid);
+                    return setDoc(userDocRef, {
+                        email: userCredential.user.email,
+                        privileges: 'normal',
+                        createdAt: serverTimestamp()
+                    });
+                })
+                .catch(err => document.getElementById('signup-error').textContent = err.message);
+        });
+        
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth);
+        });
 
-    } else { user=null; authArea.textContent = 'Not signed in'; el('signinBtn').style.display='inline-block'; el('signupBtn').style.display='inline-block'; el('signoutBtn').style.display='none'; adminPanel.classList.remove('visible'); accountInfo.textContent='—'; }
-  });
+        async function checkAdminStatus(uid) {
+            const userDocRef = doc(db, "users", uid);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists() && userDoc.data().privileges === 'admin') {
+                adminBtn.classList.remove('hidden');
+            } else {
+                adminBtn.classList.add('hidden');
+            }
+        }
 
-  // realtime: listen to variants and shop collections
-  db.collection('variants').onSnapshot(snap=>{ renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))); });
-  db.collection('shop').onSnapshot(snap=>{ renderShopFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))); });
-}
+        // 6. --- ROOM MANAGEMENT ---
+        createRoomBtn.addEventListener('click', async () => {
+            const roomId = generateRoomCode();
+            const roomRef = doc(db, 'rooms', roomId);
+            const defaultRoomState = {
+                ownerId: currentUser.uid,
+                money: 0,
+                gubbyName: 'Gubby',
+                hunger: 100,
+                thirst: 100,
+                energy: 100,
+                currentVariant: 'default.png',
+                upgrades: {
+                    clickMultiplier: 1,
+                },
+                lastTick: serverTimestamp(),
+                createdAt: serverTimestamp()
+            };
+            await setDoc(roomRef, defaultRoomState);
+            joinRoom(roomId);
+        });
 
-// Auth buttons
-el('signupBtn').addEventListener('click', async ()=>{
-  if(Object.keys(firebaseConfig).length===0){ alert('Paste firebaseConfig in the file to enable auth'); return; }
-  const email = el('email').value, pwd = el('password').value; if(!email || !pwd) return alert('enter credentials');
-  try{ await auth.createUserWithEmailAndPassword(email,pwd); alert('Signup successful'); }catch(e){ alert(e.message); }
-});
+        joinRoomBtn.addEventListener('click', () => {
+            const roomId = document.getElementById('room-code-input').value.toUpperCase();
+            if(roomId) joinRoom(roomId);
+        });
 
-el('signinBtn').addEventListener('click', async ()=>{
-  if(Object.keys(firebaseConfig).length===0){ alert('Paste firebaseConfig in the file to enable auth'); return; }
-  const email = el('email').value, pwd = el('password').value; if(!email || !pwd) return alert('enter credentials');
-  try{ await auth.signInWithEmailAndPassword(email,pwd); }catch(e){ alert(e.message); }
-});
+        async function joinRoom(roomId) {
+            const roomRef = doc(db, 'rooms', roomId);
+            const roomDoc = await getDoc(roomRef);
 
-el('signoutBtn').addEventListener('click', async ()=>{ await auth.signOut(); alert('Signed out'); });
+            if (roomDoc.exists()) {
+                currentRoomId = roomId;
+                roomSelection.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                roomCodeDisplay.textContent = roomId;
+                
+                if (roomDoc.data().gubbyName === 'Gubby') {
+                    openModal('name-modal');
+                }
 
-// Admin create variant
-el('createVariantBtn').addEventListener('click', async ()=>{
-  if(!db) return alert('Enable Firebase config first');
-  const id = el('variantId').value.trim(); const file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0; let attrs = {};
-  try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON for attributes'); }
-  if(!id||!file) return alert('Provide id and file name');
-  // Validate by checking if file exists on server
-  try{
-    const res = await fetch('/sprites/variants/'+file, {method:'HEAD'});
-    if(!res.ok){ if(!confirm('Variant image not found at /sprites/variants/'+file+". Create anyway?")) return; }
-  }catch(e){ if(!confirm('Could not check file existence. Create anyway?')) return; }
-  // Create variant doc and shop item
-  const variantDoc = {
-    id, fileName:file, price, attributes:attrs, createdBy: user? user.uid : 'local', createdAt: Date.now()
-  };
-  try{
-    await db.collection('variants').add(variantDoc);
-    // also add to shop as purchasable upgrade
-    await db.collection('shop').add({type:'variant', variantFile:file, variantId:id, price:price, attributes:attrs});
-    alert('Variant + shop item created');
-  }catch(e){ alert('Firestore error: '+e.message); }
-});
+                listenToRoomUpdates(roomId);
+                startGameLoop();
+            } else {
+                document.getElementById('room-error').textContent = "Room not found.";
+            }
+        }
+        
+        document.getElementById('save-name-btn').addEventListener('click', () => {
+            const newName = document.getElementById('gubby-name-input').value;
+            if (newName && currentRoomId) {
+                const roomRef = doc(db, 'rooms', currentRoomId);
+                updateDoc(roomRef, { gubbyName: newName });
+                closeModal('name-modal');
+            }
+        });
 
-// Render helpers for shop & variants
-function renderShop(){ // client-side fallback shop (if firestore not configured)
-  const local = [
-    {title:'Upgrade Click Power', price:100, onbuy:()=>{ state.upgrades.clickPower +=1; state.totalClicks = Math.max(0,state.totalClicks - 100); saveState(); applyStateToUI(); }},
-    {title:'Auto Clicker', price:500, onbuy:()=>{ state.upgrades.autoClicks+=1; state.totalClicks = Math.max(0,state.totalClicks - 500); saveState(); applyStateToUI(); }},
-    {title:'Multiplier +50%', price:1500, onbuy:()=>{ state.upgrades.multipliers.push(1.5); state.totalClicks = Math.max(0,state.totalClicks - 1500); saveState(); applyStateToUI(); }}
-  ];
-  shopList.innerHTML=''; local.forEach(it=>{
-    const d = document.createElement('div'); d.className='row'; d.style.justifyContent='space-between'; d.innerHTML = `<div><strong>${it.title}</strong><div class="small">Price: ${it.price} clicks</div></div><div><button>Buy</button></div>`;
-    shopList.appendChild(d); d.querySelector('button').addEventListener('click', ()=>{ if(state.totalClicks < it.price) return alert('Not enough clicks'); it.onbuy(); });
-  });
-}
+        // 7. --- REALTIME DATABASE LISTENER ---
+        function listenToRoomUpdates(roomId) {
+            const roomRef = doc(db, 'rooms', roomId);
+            if (unsubscribeFromRoom) unsubscribeFromRoom();
 
-function renderShopFromFirestore(items){ shopList.innerHTML=''; items.forEach(doc=>{
-  const d = document.createElement('div'); d.className='row'; d.style.justifyContent='space-between'; d.innerHTML = `<div><strong>${doc.type||doc.title||'Shop Item'}</strong><div class="small">Price: ${doc.price || doc.price}</div></div><div><button>Buy</button></div>`;
-  shopList.appendChild(d); d.querySelector('button').addEventListener('click', async ()=>{
-    // purchase handling: for demo we deduct from totalClicks and apply attributes
-    if(state.totalClicks < (doc.price||0)) return alert('Not enough clicks');
-    state.totalClicks = Math.max(0, state.totalClicks - (doc.price||0));
-    // if variant type, equip variant or add to upgrades
-    if(doc.type==='variant'){ state.variant = doc.variantFile; }
-    if(doc.attributes){ // apply basic attributes
-      if(doc.attributes.clickMultiplier) state.upgrades.multipliers.push(doc.attributes.clickMultiplier);
-      if(doc.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + doc.attributes.autoClicks;
-      if(doc.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + doc.attributes.clickPower;
-    }
-    saveState(); applyStateToUI(); if(db) syncRoom(); alert('Purchased');
-  });
-}); }
+            unsubscribeFromRoom = onSnapshot(roomRef, (doc) => {
+                const data = doc.data();
+                if (!data) return;
 
-function renderVariantsClientSide(){ // show files inside sprites/variants by scanning known filenames in repo? fallback to common list
-  const known = ['default.png','water.png','lava.png','grass.png']; variantsList.innerHTML=''; known.forEach(fn=>{ const pill = document.createElement('div'); pill.className='variant-pill'; pill.textContent = fn; pill.addEventListener('click', ()=>{ state.variant = fn; applyStateToUI(); saveState(); if(db) syncRoom(); }); variantsList.appendChild(pill); }); }
+                moneyStat.textContent = data.money;
+                hungerStat.textContent = Math.round(data.hunger);
+                thirstStat.textContent = Math.round(data.thirst);
+                energyStat.textContent = Math.round(data.energy);
+                gubbyNameDisplay.textContent = data.gubbyName;
+                
+                gubby.isDead = data.hunger <= 0 || data.thirst <= 0;
+                gubby.img.src = gubby.isDead ? 'sprites/dead.png' : `sprites/variants/${data.currentVariant}`;
+            });
+        }
+        
+        function updateFirestoreState(field, value) {
+            if (!currentRoomId) return;
+            const roomRef = doc(db, 'rooms', currentRoomId);
+            updateDoc(roomRef, { [field]: value })
+                .catch(err => console.error("Error updating state:", err));
+        }
+        
+        function incrementFirestoreState(field, amount) {
+             if (!currentRoomId) return;
+            const roomRef = doc(db, 'rooms', currentRoomId);
+            updateDoc(roomRef, { [field]: increment(amount) })
+                .catch(err => console.error("Error incrementing state:", err));
+        }
 
-function renderVariantsFromFirestore(items){ variantsList.innerHTML=''; items.forEach(v=>{ const pill = document.createElement('div'); pill.className='variant-pill'; pill.textContent = v.fileName + (v.price? ' — ' + v.price : ''); pill.addEventListener('click', ()=>{ state.variant = v.fileName; applyStateToUI(); saveState(); if(db) syncRoom(); }); variantsList.appendChild(pill); }); }
+        // 8. --- CANVAS & GAME LOOP ---
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
 
-// Sync room state (simple design): store per-user room under rooms/{roomCode}
-async function syncRoom(){ if(!db || !user) return; try{ const roomDoc = db.collection('rooms').doc('user_'+user.uid); await roomDoc.set({state, updatedAt: Date.now(), owner:user.uid}); }catch(e){ console.error(e); } }
+        function startGameLoop() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            lastTickTime = performance.now();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
 
-// Utility: dynamic script loader
-function loadScript(src){ return new Promise((resolve,reject)=>{ const s=document.createElement('script'); s.src=src; s.onload=resolve; s.onerror=reject; document.head.appendChild(s); }); }
+        function gameLoop(timestamp) {
+            if (!currentRoomId) return;
 
-// Auto-enable firebase if config provided
-if(Object.keys(firebaseConfig).length>0){ enableFirebase(); }
+            const deltaTime = timestamp - lastTickTime;
+            lastTickTime = timestamp;
 
-// expose to window for debugging
-window.gubbyGame = { state, saveState, loadState, enableFirebase };
+            updateGameLogic(deltaTime);
+            updateGubbyMovement();
+            render();
 
-</script>
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+        
+        async function updateGameLogic(deltaTime) {
+            timeOfDay = (timeOfDay + deltaTime) % (DAY_NIGHT_DURATION * 2);
+            const wasDay = isDay;
+            isDay = timeOfDay < DAY_NIGHT_DURATION;
+            
+            if(wasDay !== isDay) {
+                gubby.isSleeping = !isDay;
+                document.getElementById('day-night-overlay').style.opacity = isDay ? '0' : '0.4';
+            }
+            
+            // This logic should ideally be a cloud function to prevent multiple clients from running it.
+            // For simplicity, we'll run it here. Only the room owner will try to update.
+            const roomRef = doc(db, 'rooms', currentRoomId);
+            const roomDoc = await getDoc(roomRef);
+            const data = roomDoc.data();
+
+            if (data.ownerId === currentUser.uid) {
+                const now = Date.now();
+                const lastTick = data.lastTick.toDate().getTime();
+                const ticksPassed = Math.floor((now - lastTick) / GAME_TICK_RATE);
+
+                if (ticksPassed > 0) {
+                    if (!gubby.isDead) {
+                        const hungerLoss = ticksPassed * 1;
+                        const thirstLoss = ticksPassed * 1.5;
+                        const energyChange = gubby.isSleeping ? ticksPassed * 2 : ticksPassed * -0.5;
+                        
+                        updateDoc(roomRef, {
+                            hunger: increment(-hungerLoss),
+                            thirst: increment(-thirstLoss),
+                            energy: increment(energyChange),
+                            lastTick: serverTimestamp()
+                        });
+                    }
+                }
+            }
+        }
+        
+        function updateGubbyMovement() {
+            if (gubby.isDead || gubby.isSleeping) return;
+
+            gubby.x += gubby.vx;
+            gubby.y += gubby.vy;
+
+            if (gubby.x <= 0 || gubby.x + gubby.width >= canvas.width) gubby.vx *= -1;
+            if (gubby.y <= 0 || gubby.y + gubby.height >= canvas.height) gubby.vy *= -1;
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#8c6d52';
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
+            ctx.drawImage(gubby.img, gubby.x, gubby.y, gubby.width, gubby.height);
+        }
+
+        // 9. --- GAME ACTIONS & CONTROLS ---
+        canvas.addEventListener('click', async (event) => {
+            if (gubby.isDead || gubby.isSleeping) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            if (x >= gubby.x && x <= gubby.x + gubby.width &&
+                y >= gubby.y && y <= gubby.y + gubby.height) {
+                const roomRef = doc(db, 'rooms', currentRoomId);
+                const roomDoc = await getDoc(roomRef);
+                const clickPower = roomDoc.data().upgrades.clickMultiplier || 1;
+                incrementFirestoreState('money', clickPower);
+            }
+        });
+        
+        document.getElementById('feed-btn').addEventListener('click', () => {
+             incrementFirestoreState('money', -10);
+             incrementFirestoreState('hunger', 20);
+             incrementFirestoreState('energy', 5);
+        });
+
+        document.getElementById('water-btn').addEventListener('click', () => {
+             incrementFirestoreState('money', -5);
+             incrementFirestoreState('thirst', 25);
+        });
+        
+        // 10. --- SHOP & ADMIN LOGIC ---
+        shopBtn.addEventListener('click', async () => {
+            const variantsCollectionRef = collection(db, 'variants');
+            const snapshot = await getDocs(variantsCollectionRef);
+            const variantsGrid = document.getElementById('variants-grid');
+            variantsGrid.innerHTML = '';
+            
+            snapshot.forEach(doc => {
+                const variant = doc.data();
+                const item = document.createElement('div');
+                item.className = 'shop-item';
+                item.innerHTML = `
+                    <img src="sprites/variants/${variant.filename}" alt="${variant.name}">
+                    <h4>${variant.name}</h4>
+                    <p>${variant.description}</p>
+                    <p>Multiplier: x${variant.multiplier}</p>
+                    <button onclick="buyVariant('${doc.id}', ${variant.price})">Buy (💰${variant.price})</button>
+                `;
+                variantsGrid.appendChild(item);
+            });
+            
+            openModal('shop-modal');
+        });
+        
+        window.buyVariant = async function(variantId, price) {
+            const roomRef = doc(db, 'rooms', currentRoomId);
+            const roomDoc = await getDoc(roomRef);
+            if (roomDoc.data().money >= price) {
+                const variantRef = doc(db, 'variants', variantId);
+                const variantDoc = await getDoc(variantRef);
+                const variantData = variantDoc.data();
+                
+                updateDoc(roomRef, {
+                    money: increment(-price),
+                    currentVariant: variantData.filename,
+                    'upgrades.clickMultiplier': variantData.multiplier
+                });
+
+                alert(`You bought ${variantData.name}!`);
+                closeModal('shop-modal');
+            } else {
+                alert("Not enough money!");
+            }
+        }
+        
+        adminBtn.addEventListener('click', () => openModal('admin-panel-modal'));
+        
+        addVariantBtn.addEventListener('click', async () => {
+            const name = document.getElementById('variant-name').value;
+            const filename = document.getElementById('variant-filename').value;
+            const price = parseInt(document.getElementById('variant-price').value);
+            const multiplier = parseFloat(document.getElementById('variant-multiplier').value);
+            const description = document.getElementById('variant-description').value;
+            
+            if(!name || !filename || !price || !multiplier) {
+                document.getElementById('admin-error').textContent = "All fields are required.";
+                return;
+            }
+            
+            try {
+                const newVariantRef = doc(collection(db, 'variants'));
+                await setDoc(newVariantRef, {
+                    name, filename, price, multiplier, description
+                });
+                alert('Variant added successfully!');
+                closeModal('admin-panel-modal');
+            } catch(err) {
+                console.error("Admin error:", err);
+                document.getElementById('admin-error').textContent = "You do not have permission or an error occurred.";
+            }
+        });
+
+    </script>
 </body>
 </html>
