@@ -1,148 +1,190 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Gubby Clicker</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="styles.css">
-<style>
-/* Keep your original CSS here or in styles.css */
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f8f8f8;
-  color: #222;
-}
-body.multiplayer-mode {
-  background: #eef6ff;
-}
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  background: #fff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-header h1 { font-size: clamp(18px, 2vw, 28px); }
-button {
-  padding: 8px 14px;
-  font-size: clamp(14px, 1.5vw, 18px);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-button.primary { background: #4cafef; color: white; }
-button.danger { background: #e74c3c; color: white; }
-#stats { display: flex; gap: 10px; padding: 10px; }
-.stat { flex: 1; }
-.progress {
-  height: 20px;
-  background: #ddd;
-  border-radius: 10px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: #4cafef;
-}
-#shopModal, #chatModal {
-  display: none;
-  position: fixed;
-  top:0; left:0; right:0; bottom:0;
-  background: rgba(0,0,0,0.5);
-  justify-content: center;
-  align-items: center;
-}
-.modal-content {
-  background: white;
-  padding: 20px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90%;
-  overflow-y: auto;
-  border-radius: 8px;
-}
-.shop-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 10px;
-}
-.shop-item {
-  background: #fafafa;
-  border: 1px solid #ccc;
-  padding: 8px;
-  text-align: center;
-  border-radius: 6px;
-}
-.shop-item.owned { background: #d4ffd4; }
-.chat-box {
-  height: 300px;
-  overflow-y: auto;
-  background: #f0f0f0;
-  padding: 8px;
-  border: 1px solid #ccc;
-}
-.chat-input { display: flex; margin-top: 8px; }
-.chat-input input { flex: 1; padding: 6px; }
-.chat-input button { padding: 6px 12px; }
-#gubby {
-  display: block;
-  margin: 20px auto;
-  width: 150px;
-  cursor: pointer;
-}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gubby Clicker — Firestore Multiplayer</title>
+  <style>
+    :root{
+      --bg:#ffffff; --bg-2:#f4fbff;
+      --accent:#61b7ff; --accent2:#8fd6ff;
+      --room-accent:#ffd9a8; --room-accent2:#ffe7c9;
+      --muted:#6b7280; --card:#fff;
+      --maxw:1200px;
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),var(--bg-2));}
+    body.room-mode{background:linear-gradient(180deg,var(--room-accent),var(--room-accent2));}
+    .wrap{max-width:var(--maxw);margin:20px auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+    header{display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--card);border-radius:10px;box-shadow:0 10px 40px rgba(10,20,40,0.06)}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:white;font-weight:800}
+    .title{font-size:18px;margin:0}
+    .subtitle{font-size:13px;color:var(--muted)}
+    .top-actions{display:flex;gap:8px;align-items:center}
+    .btn{padding:10px 12px;border-radius:10px;border:0;background:var(--accent);color:white;font-weight:700;cursor:pointer}
+    .btn.secondary{background:white;color:var(--accent);border:1px solid rgba(75,110,255,0.12)}
+    .btn.ghost{background:transparent;border:1px solid rgba(12,40,80,0.06);color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:14px}
+    @media (max-width:1000px){ .grid{grid-template-columns:1fr 320px} }
+    @media (max-width:760px){ .grid{grid-template-columns:1fr} header{flex-direction:column;align-items:stretch} .top-actions{justify-content:flex-end} }
+    .card{background:var(--card);padding:12px;border-radius:10px;border:1px solid rgba(12,40,80,0.04)}
+    .house{height:420px;border-radius:10px;background:linear-gradient(180deg,#fff,#eef9ff);position:relative;overflow:hidden;border:1px solid rgba(12,40,80,0.04)}
+    .gubby{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:140px;height:140px;pointer-events:auto;cursor:pointer;z-index:40}
+    .stats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+    .stat{min-width:160px;background:white;border-radius:10px;padding:10px;border:1px solid rgba(12,40,80,0.04);text-align:center}
+    .stat .label{font-size:12px;color:var(--muted)}
+    .stat .value{font-weight:800;font-size:18px;margin-top:6px}
+    .bar{height:12px;background:#eef6ff;border-radius:999px;margin-top:8px;overflow:hidden}
+    .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .2s}
+    body.room-mode .fill{background:linear-gradient(90deg,var(--room-accent),var(--room-accent2))}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+    .right-col{display:flex;flex-direction:column;gap:12px}
+    .variants-list{display:flex;flex-direction:column;gap:8px}
+    .member-list{display:flex;flex-direction:column;gap:8px}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(8,10,20,0.45);display:none;align-items:center;justify-content:center;z-index:999}
+    .modal{width:92%;max-width:900px;background:white;border-radius:10px;padding:16px;box-shadow:0 30px 80px rgba(12,40,80,0.2);transform:translateY(8px);opacity:0;transition:all .18s}
+    .modal.show{transform:none;opacity:1}
+    .shop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    @media (max-width:900px){ .shop-grid{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:600px){ .shop-grid{grid-template-columns:1fr} }
+    .shop-card{border-radius:10px;padding:10px;background:linear-gradient(180deg,#fff,#f6fbff);border:1px solid rgba(12,40,80,0.04);display:flex;flex-direction:column;gap:8px;min-height:110px}
+    .chat-window{height:360px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;border:1px solid rgba(12,40,80,0.06)}
+    .chat-messages{flex:1;padding:10px;overflow:auto;background:#fbfdff}
+    .chat-input{display:flex;gap:8px;padding:8px;border-top:1px solid rgba(12,40,80,0.04);background:white}
+    .small{font-size:13px;color:var(--muted)}
+    .badge{background:#fff;padding:6px 8px;border-radius:8px;border:1px solid rgba(12,40,80,0.04);font-weight:700}
+    textarea{width:100%;min-height:60px}
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">G</div>
+        <div>
+          <h1 class="title">Gubby Clicker</h1>
+          <div class="small">Clicker — Firestore multiplayer</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div id="authArea" class="small">Not signed in</div>
+        <button id="signInBtn" class="btn secondary">Sign in</button>
+        <button id="shopOpenBtn" class="btn secondary">Shop</button>
+      </div>
+    </header>
 
-<header>
-  <h1>🐟 Gubby Clicker</h1>
-  <div id="authButtons">
-    <button id="loginBtn" class="primary">Login</button>
-    <button id="logoutBtn" style="display:none;">Logout</button>
-  </div>
-</header>
+    <div class="grid">
+      <div class="card">
+        <div class="house" id="house">
+          <img id="gubbySprite" class="gubby" src="sprites/variants/default.png" draggable="false" alt="Gubby">
+        </div>
 
-<div id="stats">
-  <div class="stat">Hunger<div class="progress"><div id="hungerBar" class="progress-fill"></div></div></div>
-  <div class="stat">Thirst<div class="progress"><div id="thirstBar" class="progress-fill"></div></div></div>
-  <div class="stat">Energy<div class="progress"><div id="energyBar" class="progress-fill"></div></div></div>
-</div>
+        <div class="stats">
+          <div class="stat"><div class="label">HUNGER</div><div class="value" id="hungerVal">0</div><div class="bar"><div id="hungerFill" class="fill" style="width:0%"></div></div></div>
+          <div class="stat"><div class="label">THIRST</div><div class="value" id="thirstVal">0</div><div class="bar"><div id="thirstFill" class="fill" style="width:0%"></div></div></div>
+          <div class="stat"><div class="label">ENERGY</div><div class="value" id="energyVal">0</div><div class="bar"><div id="energyFill" class="fill" style="width:0%"></div></div></div>
+        </div>
 
-<img id="gubby" src="https://i.imgur.com/nH4YtTf.png" alt="Gubby">
+        <div class="controls">
+          <button id="feedBtn" class="btn">Feed</button>
+          <button id="waterBtn" class="btn secondary">Give Water</button>
+          <button id="colaBtn" class="btn secondary">Bloxy Cola</button>
+          <button id="playBtn" class="btn secondary">Play</button>
+          <button id="hostBtn" class="btn">Host</button>
+          <button id="joinBtn" class="btn secondary">Join</button>
+          <button id="resetBtn" class="btn ghost">Request Reset</button>
+          <button id="chatOpenBtn" class="btn secondary" style="display:none">💬 Chat</button>
+        </div>
 
-<div style="padding:10px;">
-  <button id="shopBtn">🛒 Shop</button>
-  <button id="hostBtn" class="primary">Host Game</button>
-  <button id="joinBtn" class="primary">Join Game</button>
-  <button id="chatBtn">💬 Chat</button>
-  <button id="resetBtn" class="danger">Reset Room</button>
-</div>
+        <div class="small" style="text-align:center;margin-top:8px">Click Gubby to get clicks. Singleplayer and multiplayer saves are separate.</div>
+      </div>
 
-<div id="shopModal">
-  <div class="modal-content">
-    <h2>Shop</h2>
-    <div id="shopItems" class="shop-grid"></div>
-    <button onclick="closeShop()">Close</button>
-  </div>
-</div>
+      <div class="right-col">
+        <div class="card">
+          <strong>Connection</strong>
+          <div class="small" style="margin-top:8px">Rooms: sign in, host or join with a 4-letter code.</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <div><div class="small">Status</div><div id="connectionStatus" style="font-weight:800">Not connected</div></div>
+            <div style="text-align:right">
+              <div id="roomCode" style="font-weight:900"></div>
+              <div style="margin-top:6px"><button id="copyRoom" class="btn small ghost" style="display:none">Copy</button> <button id="leaveRoom" class="btn small ghost" style="display:none">Leave</button></div>
+            </div>
+          </div>
 
-<div id="chatModal">
-  <div class="modal-content">
-    <h2>Room Chat</h2>
-    <div id="chatMessages" class="chat-box"></div>
-    <div class="chat-input">
-      <input id="chatInput" placeholder="Type a message...">
-      <button onclick="sendChat()">Send</button>
+          <div style="margin-top:12px">
+            <div class="small">Members</div>
+            <div id="members" class="member-list"></div>
+          </div>
+
+          <div style="margin-top:8px"><div id="resetStatus" class="small"></div></div>
+        </div>
+
+        <div class="card">
+          <strong>Account</strong>
+          <div id="accountInfo" class="small" style="margin-top:8px">—</div>
+        </div>
+
+        <div class="card" id="adminPanel" style="display:none">
+          <strong>Admin</strong>
+          <div class="small" style="margin-top:8px">Create variants (modifiers) — quick UI</div>
+        </div>
+      </div>
     </div>
-    <button onclick="closeChat()">Close</button>
-  </div>
-</div>
 
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-<script src="script.js"></script>
+    <footer class="small" style="text-align:center">Gubby Clicker — Firestore rooms · 50+ shop items</footer>
+  </div>
+
+  <!-- Shop Modal -->
+  <div class="modal-backdrop" id="shopModal"><div class="modal" id="shopBox">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Shop</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="small">Clicks: <span id="clickCounter">0</span></div>
+        <button id="closeShop" class="btn secondary">Close</button>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div id="shopGrid" class="shop-grid"></div>
+    </div>
+  </div></div>
+
+  <!-- Chat Modal -->
+  <div class="modal-backdrop" id="chatModal"><div class="modal" id="chatBox">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Room Chat</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="small" id="chatRoomLabel"></div>
+        <button id="closeChat" class="btn secondary">Close</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="chat-window">
+      <div id="chatMessages" class="chat-messages"></div>
+      <div class="chat-input">
+        <input id="chatInput" placeholder="Say something..." style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(12,40,80,0.06)"/>
+        <button id="chatSend" class="btn">Send</button>
+        <button id="chatClear" class="btn ghost small">Clear</button>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- Join Modal (simple prompt-style) -->
+  <div class="modal-backdrop" id="joinModal"><div class="modal" id="joinBox">
+    <h3>Join Room</h3>
+    <input id="joinCode" placeholder="4-letter code" style="padding:8px;width:180px;border-radius:6px;border:1px solid #ddd"/>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button id="joinConfirm" class="btn">Join</button>
+      <button id="joinCancel" class="btn secondary">Cancel</button>
+    </div>
+  </div></div>
+
+  <!-- Firebase compat scripts (must be loaded before script.js) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- main logic -->
+  <script src="script.js"></script>
 </body>
 </html>
