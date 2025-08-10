@@ -3,44 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Gubby House — Full Game (P2P + Firestore Admin)</title>
-
-<!--
-  Firestore Rules (paste into Firebase Console -> Firestore -> Rules)
-  -----------------------------------------------------------------
-  rules_version = '2';
-  service cloud.firestore {
-    match /databases/{database}/documents {
-      match /users/{userId} {
-        allow create: if request.auth != null && request.auth.uid == userId;
-        allow read: if request.auth != null && request.auth.uid == userId;
-        allow update: if request.auth != null && (
-          (request.auth.uid == userId && !("privileges" in request.resource.data))
-          || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin')
-        );
-      }
-      match /variants/{variantId} {
-        allow read: if true;
-        allow create, update, delete: if request.auth != null &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin';
-      }
-      match /shop/{shopId} {
-        allow read: if true;
-        allow create, update, delete: if request.auth != null &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.privileges == 'admin';
-      }
-      match /rooms/{roomId} {
-        allow read: if true;
-        allow create, update: if request.auth != null;
-      }
-      match /{document=**} { allow read, write: if false; }
-    }
-  }
-  Notes:
-  - Users doc must be created at /users/{uid} with privileges:'normal' by default.
-  - Admins set 'privileges' to 'admin' via console for admin access.
--->
-
+<title>Gubby House — Fixed Sprites & Move-Energy + Click Sound</title>
 <style>
 :root{--bg:#f3f7fb;--card:#fff;--accent:#6b8cff}
 *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
@@ -77,14 +40,15 @@ textarea{min-height:72px; font-family:monospace; white-space:pre-wrap}
 <body>
   <div class="app" id="app">
     <header>
-      <h1>Gubby House — P2P + Firestore Admin</h1>
+      <h1>Gubby House — Fixed Sprites & Move-Energy + Click Sound</h1>
       <div style="margin-left:auto" id="authArea" class="muted small">Not signed in</div>
     </header>
 
     <div class="main">
       <div class="left">
         <div class="house" id="house">
-          <img id="gubbySprite" class="gubby-sprite" src="../sprites/variants/default.png" style="left:50%;top:60%" draggable="false" />
+          <!-- initial left/top will be overridden by state (px coords) -->
+          <img id="gubbySprite" class="gubby-sprite" src="sprites/variants/default.png" style="left:260px;top:210px" draggable="false" />
         </div>
 
         <div class="hud">
@@ -144,7 +108,7 @@ textarea{min-height:72px; font-family:monospace; white-space:pre-wrap}
           <div style="margin-top:8px">
             <label>Variant ID</label>
             <input type="text" id="variantId" placeholder="e.g. LavaGubby" />
-            <label style="margin-top:6px">File name (inside ../sprites/variants/)</label>
+            <label style="margin-top:6px">File name (inside sprites/variants/)</label>
             <input type="text" id="variantFile" placeholder="e.g. lava.png" />
             <label style="margin-top:6px">Price (clicks)</label>
             <input type="number" id="variantPrice" value="500" />
@@ -154,13 +118,13 @@ textarea{min-height:72px; font-family:monospace; white-space:pre-wrap}
               <button id="createVariantBtn">Create Variant in Firestore</button>
               <button id="refreshVariants" class="secondary">Refresh</button>
             </div>
-            <div class="muted small" style="margin-top:8px">Admin-only: creating a variant will add a shop upgrade in Firestore. Ensure the file exists under ../sprites/variants/ in your hosted repo.</div>
+            <div class="muted small" style="margin-top:8px">Admin-only: creating a variant will add a shop upgrade in Firestore. Ensure the file exists under <code>sprites/variants/</code> in your hosted repo.</div>
           </div>
         </div>
 
       </div>
     </div>
-    <footer>Standalone P2P + Firestore admin UI. Sprites base path = <code>../sprites/variants/</code></footer>
+    <footer>Standalone P2P + Firestore admin UI. Sprites base path = <code>sprites/variants/</code>, sounds = <code>sounds/</code></footer>
   </div>
 
 <!-- Firebase SDKs (compat) -->
@@ -169,10 +133,7 @@ textarea{min-height:72px; font-family:monospace; white-space:pre-wrap}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* ====== CONFIG ======
-   Make sure this matches your Firebase project.
-   (You provided this earlier; keep it or replace with your own.)
-*/
+/* ====== CONFIG (keep or replace) ====== */
 const firebaseConfig = {
   apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
   authDomain: "gubby-clicker.firebaseapp.com",
@@ -183,11 +144,18 @@ const firebaseConfig = {
   measurementId: "G-R3HFMPH5C4"
 };
 
-/* FIX: sprite base path (relative to page).
-   Use ../sprites/variants/ so hosted path like:
-   https://beston3000.github.io/gubbyclicker/sprites/variants/default.png
-*/
-const SPRITE_BASE_PATH = "../sprites/variants/";
+/* IMPORTANT PATH FIXES */
+const SPRITE_BASE_PATH = "sprites/variants/"; // <-- fixed: no ../ so page at /gubbyclicker/index.html loads from /gubbyclicker/sprites/variants/
+const SOUND_BASE_PATH  = "sounds/";           // put merp.mp3 at /gubbyclicker/sounds/merp.mp3
+
+/* Preload click sound */
+let merpAudio = null;
+(function preloadSound(){
+  merpAudio = new Audio(SOUND_BASE_PATH + 'merp.mp3');
+  merpAudio.preload = 'auto';
+  // silence any console error if file missing
+  merpAudio.addEventListener('error', ()=> { console.warn('merp.mp3 not found at', SOUND_BASE_PATH + 'merp.mp3'); });
+})();
 
 /* ====== App State & UI Helpers ====== */
 function el(id){ return document.getElementById(id); }
@@ -226,7 +194,7 @@ applyStateToUI();
 renderShop();
 renderVariantsClientSide();
 
-/* Button wiring */
+/* Buttons */
 el('guestBtn').addEventListener('click', ()=>{ user = {uid:'guest_'+randomId(), displayName:'Guest'}; onSignedIn(); });
 el('googleSignIn').addEventListener('click', ()=>{ if(!auth) initFirebaseAndAuth(); signInWithGoogle(); });
 el('feedBtn').addEventListener('click', ()=>{ if(!state.alive) return; state.hunger = Math.min(100,state.hunger+25); syncLocalAndPeers(); });
@@ -239,17 +207,17 @@ el('pasteInvite').addEventListener('click', ()=>{ const s=prompt('Paste invite/a
 el('processInvite').addEventListener('click', ()=>{ const s = el('inviteIn').value.trim(); if(!s) return alert('Paste invite/answer first'); processInviteString(s); });
 el('disconnectBtn').addEventListener('click', disconnectPeer);
 
+/* Admin create variant */
 el('createVariantBtn').addEventListener('click', async ()=>{
   if(!db || !user) return alert('Sign-in and enable Firestore to create variants in DB.');
   const id = el('variantId').value.trim(); const file = el('variantFile').value.trim(); const price = Number(el('variantPrice').value)||0;
   let attrs={}; try{ attrs = JSON.parse(el('variantAttrs').value || '{}'); }catch(e){ return alert('Invalid JSON in attributes'); }
   if(!id||!file) return alert('Provide id and file name');
-  // Quick validation: try to HEAD the sprite path (best-effort)
+  // Check sprite exists at SPRITE_BASE_PATH + file
   try{
     const res = await fetch(SPRITE_BASE_PATH + file, {method:'HEAD'});
     if(!res.ok && !confirm('Sprite not found at '+SPRITE_BASE_PATH+file+'. Create anyway?')) return;
   }catch(e){ if(!confirm('Could not verify sprite file, continue anyway?')) return; }
-  // create firestore docs
   try{
     const variantsRef = db.collection('variants');
     const shopRef = db.collection('shop');
@@ -265,11 +233,9 @@ function initFirebaseAndAuth(){
     firebase.initializeApp(firebaseConfig);
     auth = firebase.auth();
     db = firebase.firestore();
-    // auth state observer
     auth.onAuthStateChanged(async u => {
       if(u){
         user = u;
-        // ensure user doc exists
         try{
           const userRef = db.collection('users').doc(u.uid);
           const doc = await userRef.get();
@@ -287,15 +253,9 @@ function initFirebaseAndAuth(){
       }
     });
 
-    // listen to variants & shop in firestore
-    db.collection('variants').onSnapshot(snap => {
-      const items = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-      renderVariantsFromFirestore(items);
-    });
-    db.collection('shop').onSnapshot(snap => {
-      const items = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-      renderShopFromFirestore(items);
-    });
+    // realtime listeners
+    db.collection('variants').onSnapshot(snap => { renderVariantsFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))); });
+    db.collection('shop').onSnapshot(snap => { renderShopFromFirestore(snap.docs.map(d=>({id:d.id,...d.data()}))); });
   }
 }
 
@@ -303,27 +263,21 @@ async function signInWithGoogle(){
   try{
     const provider = new firebase.auth.GoogleAuthProvider();
     await auth.signInWithPopup(provider);
-    // onAuthStateChanged will handle post-login
   }catch(e){ alert('Sign-in failed: '+e.message); }
 }
 
 async function onSignedIn(profile){
-  // user var might be auth user object or guest stub
-  authArea.textContent = `Signed in: ${user.displayName || user.name || user.email || 'User'}`;
+  authArea.textContent = `Signed in: ${user.displayName || user.email || user.uid}`;
   accountInfo.textContent = user.email ? `Email: ${user.email}` : `ID: ${user.uid}`;
-  // check privileges from /users/{uid} if available
   if(db && user && user.uid){
     try{
       const doc = await db.collection('users').doc(user.uid).get();
       if(doc.exists){
         const data = doc.data();
-        if(data.privileges === 'admin'){
-          adminPanel.classList.add('visible');
-        } else adminPanel.classList.remove('visible');
+        if(data.privileges === 'admin'){ adminPanel.classList.add('visible'); }
+        else adminPanel.classList.remove('visible');
         accountInfo.textContent += ` — privileges: ${data.privileges || 'normal'}`;
-      } else {
-        accountInfo.textContent += ' — users doc not found (created on signup)';
-      }
+      } else accountInfo.textContent += ' — users doc not found (created on signup)';
     }catch(e){ console.error('priv check failed', e); }
   }
   applyStateToUI();
@@ -342,7 +296,7 @@ function renderShop(){
   const all = builtins.concat(localVariants);
   all.forEach(item=>{
     const name = item.title || item.id || item.fileName;
-    const price = item.price || item.price || 100;
+    const price = item.price || 0;
     const div = document.createElement('div'); div.className='row'; div.style.justifyContent='space-between';
     div.innerHTML = `<div><strong>${name}</strong><div class="small">Price: ${price} clicks</div></div><div><button>Buy</button></div>`;
     div.querySelector('button').addEventListener('click', ()=>{
@@ -367,11 +321,7 @@ function renderShopFromFirestore(items){
       if(state.totalClicks < price) return alert('Not enough clicks');
       state.totalClicks = Math.max(0, state.totalClicks - price);
       if(doc.type === 'variant'){ state.variant = doc.variantFile; }
-      if(doc.attributes){
-        if(doc.attributes.clickMultiplier) state.upgrades.multipliers.push(doc.attributes.clickMultiplier);
-        if(doc.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + doc.attributes.autoClicks;
-        if(doc.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + doc.attributes.clickPower;
-      }
+      if(doc.attributes){ if(doc.attributes.clickMultiplier) state.upgrades.multipliers.push(doc.attributes.clickMultiplier); if(doc.attributes.autoClicks) state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + doc.attributes.autoClicks; if(doc.attributes.clickPower) state.upgrades.clickPower = (state.upgrades.clickPower||1) + doc.attributes.clickPower; }
       syncLocalAndPeers();
       alert('Purchased');
     });
@@ -403,20 +353,41 @@ function applyStateToUI(){
   hungerVal.textContent = Math.round(state.hunger);
   thirstVal.textContent = Math.round(state.thirst);
   energyVal.textContent = Math.round(state.energy);
+  // sprite path uses fixed SPRITE_BASE_PATH
   gubbySprite.src = SPRITE_BASE_PATH + state.variant;
-  // small top-right info
+  // position by px coords
+  if(typeof state.pos?.x === 'number') gubbySprite.style.left = state.pos.x + 'px';
+  if(typeof state.pos?.y === 'number') gubbySprite.style.top = state.pos.y + 'px';
   authArea.textContent = user ? (`User: ${user.displayName || user.name || (user.email||user.uid)}`) : 'Not signed in';
 }
 function saveState(){ localStorage.setItem('gubby_full_v1', JSON.stringify(state)); }
-function loadState(){ try{ const raw=localStorage.getItem('gubby_full_v1'); if(raw) return JSON.parse(raw);}catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
+function loadState(){ try{ const raw = localStorage.getItem('gubby_full_v1'); if(raw) return JSON.parse(raw); }catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
 function addClicks(n){ state.clicks += n; state.totalClicks += n; saveState(); applyStateToUI(); }
 function getMultiplier(){ let m=1; if(state.upgrades.multipliers) state.upgrades.multipliers.forEach(v=>m*=v); return m; }
 
-/* ======= Movement, decay, autos ======= */
+/* ======= Movement: energy drains when Gubby moves ======= */
 const houseRect = {w:520,h:420};
-function wander(){ if(!state.alive) return; const margin=48; const x=Math.random()*(houseRect.w-margin*2)+margin; const y=Math.random()*(houseRect.h-margin*2)+margin; state.pos.x=x; state.pos.y=y; gubbySprite.style.left = x+'px'; gubbySprite.style.top = y+'px'; }
+function wander(){
+  if(!state.alive) return;
+  const margin = 48;
+  const newX = Math.random()*(houseRect.w - margin*2) + margin;
+  const newY = Math.random()*(houseRect.h - margin*2) + margin;
+  // compute travel distance
+  const dx = (state.pos?.x || newX) - newX;
+  const dy = (state.pos?.y || newY) - newY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  // energy loss scales with distance; at least 1.
+  const energyLoss = Math.max(1, Math.round(dist/60));
+  state.pos.x = newX; state.pos.y = newY;
+  state.energy = Math.max(0, state.energy - energyLoss);
+  // if energy reaches 0, die (same behavior)
+  if(state.energy === 0){ state.alive=false; gubbySprite.src = SPRITE_BASE_PATH + 'dead.png'; }
+  gubbySprite.style.left = newX + 'px'; gubbySprite.style.top = newY + 'px';
+  saveState(); applyStateToUI(); if(dc && dc.readyState === 'open') sendMessage({t:'action', action:{type:'move', x:newX, y:newY, energyLoss}});
+}
 setInterval(wander, 3000);
 
+/* ======= decay & autos (kept but energy removed from click) ======= */
 setInterval(()=>{
   if(!state.alive) return;
   state.hunger = Math.max(0, state.hunger - 1);
@@ -429,24 +400,32 @@ setInterval(()=>{
   syncLocalAndPeers();
 }, 10000);
 
+/* ======= click: play sound and click economy (no energy drain on click now) ======= */
 gubbySprite.addEventListener('click', ()=>{
   if(!state.alive) return;
   const power = state.upgrades.clickPower * getMultiplier();
   addClicks(power);
-  state.energy = Math.max(0, state.energy - 1);
-  state.hunger = Math.max(0, state.hunger - 0.5);
-  state.thirst = Math.max(0, state.thirst - 0.7);
+  // clicking still affects hunger/thirst lightly
+  state.thirst = Math.max(0, state.thirst - 0.2);
+  state.hunger = Math.max(0, state.hunger - 0.1);
+  // play merp sound if available
+  try{
+    if(merpAudio){
+      merpAudio.currentTime = 0;
+      const p = merpAudio.play();
+      if(p && p.catch) p.catch(()=>{}); // ignore play promise errors
+    }
+  }catch(e){ console.warn('play failed', e); }
   syncLocalAndPeers();
 });
 
-/* ======= P2P (manual WebRTC signaling) ======= */
+/* ======= P2P (manual WebRTC) - unchanged ======= */
 let pc = null, dc = null, isHost = false, lastOfferId = null;
 
 function startHostInvite(){
   isHost = true; lastOfferId = randomId(); preparePeerConnection();
   dc = pc.createDataChannel('gubby'); setupDataChannel(dc);
   pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(()=> {
-    // once setLocalDescription available, produce invite
     const invite = { type:'offer', sdp: pc.localDescription.sdp, id:lastOfferId, from: user?.uid || 'guest', name: user?.displayName || 'Guest' };
     el('inviteOut').value = btoa(JSON.stringify(invite));
     alert('Invite created; copy the invite string and send to your friend.');
@@ -499,6 +478,7 @@ function applyRemoteAction(action){
   if(action.type==='feed') state.hunger = Math.min(100, state.hunger + (action.value||20));
   if(action.type==='water') state.thirst = Math.min(100, state.thirst + (action.value||20));
   if(action.type==='cola') state.energy = Math.min(100, state.energy + (action.value||40));
+  if(action.type==='move'){ state.pos.x = action.x; state.pos.y = action.y; state.energy = Math.max(0, state.energy - (action.energyLoss||1)); gubbySprite.style.left = state.pos.x + 'px'; gubbySprite.style.top = state.pos.y + 'px'; }
   saveState(); applyStateToUI();
 }
 
@@ -526,14 +506,7 @@ function showStatus(msg){ console.log('[status]', msg); accountInfo.textContent 
 
 /* ======= Utilities ======= */
 function randomId(){ return Math.random().toString(36).slice(2,9); }
-
-/* Expose for debugging */
 window.gubbyGame = { state, saveState, loadState, syncLocalAndPeers, startHostInvite, processInviteString, disconnectPeer };
-
-/* Initialize Firebase only when needed so offline guests still work */
-(function tryAutoInit(){
-  // if user hits Sign in with Google, initFirebaseAndAuth() will be called
-})();
 
 </script>
 </body>
