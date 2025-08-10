@@ -365,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     adminBtn.addEventListener('click', () => openModal('admin-panel-modal'));
     
-    addVariantBtn.addEventListener('click', async ().
+    addVariantBtn.addEventListener('click', async () => {
         const name = document.getElementById('variant-name').value;
         const filename = document.getElementById('variant-filename').value;
         const price = parseInt(document.getElementById('variant-price').value);
