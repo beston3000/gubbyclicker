@@ -82,6 +82,13 @@
             transition: background-color 0.2s;
         }
         button:hover { background-color: var(--accent-hover); }
+        #google-login-btn {
+            background-color: #4285F4;
+            margin-top: 10px;
+        }
+        #google-login-btn:hover {
+            background-color: #357ae8;
+        }
         .toggle-link { margin-top: 20px; color: var(--accent-color); cursor: pointer; }
         .error-message { color: var(--danger-color); margin-top: 15px; min-height: 20px;}
         .divider {
@@ -221,6 +228,8 @@
                     <input type="password" id="login-password" required>
                 </div>
                 <button id="login-btn">Login</button>
+                <div class="divider">OR</div>
+                <button id="google-login-btn">Sign in with Google</button>
                 <div class="error-message" id="login-error"></div>
                 <p class="toggle-link" onclick="toggleAuthForms()">Need an account? Sign Up</p>
             </div>
@@ -339,7 +348,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, updateDoc, increment, serverTimestamp, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
         // 1. --- YOUR FIREBASE CONFIGURATION ---
@@ -358,6 +367,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
 
         // 3. --- DOM ELEMENT REFERENCES ---
         const authContainer = document.getElementById('auth-container');
@@ -371,6 +381,7 @@
         // Buttons
         const loginBtn = document.getElementById('login-btn');
         const signupBtn = document.getElementById('signup-btn');
+        const googleLoginBtn = document.getElementById('google-login-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const createRoomBtn = document.getElementById('create-room-btn');
         const joinRoomBtn = document.getElementById('join-room-btn');
@@ -465,6 +476,28 @@
                     });
                 })
                 .catch(err => document.getElementById('signup-error').textContent = err.message);
+        });
+
+        googleLoginBtn.addEventListener('click', () => {
+            signInWithPopup(auth, googleProvider)
+                .then((result) => {
+                    const user = result.user;
+                    // Check if it's a new user to create a firestore doc
+                    const userDocRef = doc(db, "users", user.uid);
+                    getDoc(userDocRef).then(docSnap => {
+                        if (!docSnap.exists()) {
+                            // This is a new user, create their document
+                            setDoc(userDocRef, {
+                                email: user.email,
+                                displayName: user.displayName, // Store display name from Google
+                                privileges: 'normal',
+                                createdAt: serverTimestamp()
+                            });
+                        }
+                    });
+                }).catch((error) => {
+                    document.getElementById('login-error').textContent = error.message;
+                });
         });
         
         logoutBtn.addEventListener('click', () => {
