@@ -401,7 +401,8 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal('shop-modal');
     });
     
-    async function buyVariant(variantId, price) {
+    // Make buyVariant globally accessible
+    window.buyVariant = async function(variantId, price) {
         const roomRef = doc(db, 'rooms', currentRoomId);
         const roomDoc = await getDoc(roomRef);
         if (roomDoc.data().money >= price) {
