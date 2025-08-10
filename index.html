@@ -231,7 +231,7 @@
                 <div class="divider">OR</div>
                 <button id="google-login-btn">Sign in with Google</button>
                 <div class="error-message" id="login-error"></div>
-                <p class="toggle-link" onclick="toggleAuthForms()">Need an account? Sign Up</p>
+                <p class="toggle-link">Need an account? Sign Up</p>
             </div>
 
             <!-- Signup Form -->
@@ -247,7 +247,7 @@
                 </div>
                 <button id="signup-btn">Sign Up</button>
                 <div class="error-message" id="signup-error"></div>
-                <p class="toggle-link" onclick="toggleAuthForms()">Already have an account? Login</p>
+                <p class="toggle-link">Already have an account? Login</p>
             </div>
             
             <!-- Room Selection (shown after login) -->
@@ -302,7 +302,7 @@
 
     <div id="shop-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn" onclick="closeModal('shop-modal')">&times;</span>
+            <span class="close-btn" data-modal-id="shop-modal">&times;</span>
             <h2>Shop</h2>
             <h3>Upgrades</h3>
             <div id="upgrades-grid" class="shop-grid">
@@ -317,7 +317,7 @@
     
     <div id="admin-panel-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn" onclick="closeModal('admin-panel-modal')">&times;</span>
+            <span class="close-btn" data-modal-id="admin-panel-modal">&times;</span>
             <h2>Admin Panel: Add Gubby Variant</h2>
             <div class="form-group">
                 <label for="variant-name">Variant Name (e.g., Water Gubby)</label>
@@ -355,7 +355,6 @@
         document.addEventListener('DOMContentLoaded', () => {
 
             // 1. --- YOUR FIREBASE CONFIGURATION ---
-            // This has been updated with the config you provided.
             const firebaseConfig = {
                 apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
                 authDomain: "gubby-clicker.firebaseapp.com",
@@ -427,12 +426,12 @@
             let gameLoopId = null; // To store the requestAnimationFrame ID
 
             // --- HELPER FUNCTIONS ---
-            window.toggleAuthForms = function() {
+            function toggleAuthForms() {
                 loginForm.classList.toggle('hidden');
                 signupForm.classList.toggle('hidden');
             }
-            window.openModal = function(modalId) { document.getElementById(modalId).style.display = 'flex'; }
-            window.closeModal = function(modalId) { document.getElementById(modalId).style.display = 'none'; }
+            function openModal(modalId) { document.getElementById(modalId).style.display = 'flex'; }
+            function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
             
             function generateRoomCode() {
                 return Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -485,14 +484,12 @@
                 signInWithPopup(auth, googleProvider)
                     .then((result) => {
                         const user = result.user;
-                        // Check if it's a new user to create a firestore doc
                         const userDocRef = doc(db, "users", user.uid);
                         getDoc(userDocRef).then(docSnap => {
                             if (!docSnap.exists()) {
-                                // This is a new user, create their document
                                 setDoc(userDocRef, {
                                     email: user.email,
-                                    displayName: user.displayName, // Store display name from Google
+                                    displayName: user.displayName,
                                     privileges: 'normal',
                                     createdAt: serverTimestamp()
                                 });
@@ -644,10 +641,9 @@
                     document.getElementById('day-night-overlay').style.opacity = isDay ? '0' : '0.4';
                 }
                 
-                // This logic should ideally be a cloud function to prevent multiple clients from running it.
-                // For simplicity, we'll run it here. Only the room owner will try to update.
                 const roomRef = doc(db, 'rooms', currentRoomId);
                 const roomDoc = await getDoc(roomRef);
+                if (!roomDoc.exists()) return;
                 const data = roomDoc.data();
 
                 if (data.ownerId === currentUser.uid) {
@@ -729,20 +725,32 @@
                     const variant = doc.data();
                     const item = document.createElement('div');
                     item.className = 'shop-item';
-                    item.innerHTML = `
-                        <img src="sprites/variants/${variant.filename}" alt="${variant.name}">
-                        <h4>${variant.name}</h4>
-                        <p>${variant.description}</p>
-                        <p>Multiplier: x${variant.multiplier}</p>
-                        <button onclick="buyVariant('${doc.id}', ${variant.price})">Buy (💰${variant.price})</button>
-                    `;
+                    
+                    const img = document.createElement('img');
+                    img.src = `sprites/variants/${variant.filename}`;
+                    img.alt = variant.name;
+                    
+                    const name = document.createElement('h4');
+                    name.textContent = variant.name;
+                    
+                    const desc = document.createElement('p');
+                    desc.textContent = variant.description;
+                    
+                    const mult = document.createElement('p');
+                    mult.textContent = `Multiplier: x${variant.multiplier}`;
+                    
+                    const buyBtn = document.createElement('button');
+                    buyBtn.textContent = `Buy (💰${variant.price})`;
+                    buyBtn.addEventListener('click', () => buyVariant(doc.id, variant.price));
+                    
+                    item.append(img, name, desc, mult, buyBtn);
                     variantsGrid.appendChild(item);
                 });
                 
                 openModal('shop-modal');
             });
             
-            window.buyVariant = async function(variantId, price) {
+            async function buyVariant(variantId, price) {
                 const roomRef = doc(db, 'rooms', currentRoomId);
                 const roomDoc = await getDoc(roomRef);
                 if (roomDoc.data().money >= price) {
@@ -788,6 +796,19 @@
                     console.error("Admin error:", err);
                     document.getElementById('admin-error').textContent = "You do not have permission or an error occurred.";
                 }
+            });
+
+            // Add event listeners for elements that used onclick
+            document.querySelectorAll('.toggle-link').forEach(link => {
+                link.addEventListener('click', toggleAuthForms);
+            });
+            document.querySelectorAll('.close-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const modalId = e.target.dataset.modalId;
+                    if (modalId) {
+                        closeModal(modalId);
+                    }
+                });
             });
         });
 
