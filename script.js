@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const db = getFirestore(app);
     const googleProvider = new GoogleAuthProvider();
 
-    // 3. --- DOM ELEMENT REFERENCES ---
+    // 3. --- DOM ELEMENT REFERENCES (MOVED INSIDE) ---
     const authContainer = document.getElementById('auth-container');
     const loginForm = document.getElementById('login-form');
     const signupForm = document.getElementById('signup-form');
