@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Gubby Clicker — Firestore Multiplayer + Chat</title>
 <style>
   :root{
@@ -258,7 +258,7 @@
     </div>
   </div></div>
 
-  <!-- Game Over modal (kept basic) -->
+  <!-- Game Over modal -->
   <div class="modal-backdrop" id="gameOverBackdrop"><div class="modal" id="gameOverBox">
     <h3>Game Over</h3>
     <p class="subtitle">Gubby reached 0 in Hunger, Thirst or Energy for this room.</p>
@@ -273,7 +273,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-  <script>
+<script>
 /* ================= CONFIG ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
@@ -298,7 +298,7 @@ const defaultState = {
   backpack:{ food:5, water:5, cola:2 },
   lastUpdated: Date.now()
 };
-let state = loadState();
+let state = loadState(); // this is the current *working* state (singleplayer or merged)
 let user = null;
 let auth = null;
 let db = null;
@@ -307,7 +307,6 @@ let db = null;
 const gubbySprite = document.getElementById('gubbySprite');
 const hungerVal = document.getElementById('hungerVal'), thirstVal = document.getElementById('thirstVal'), energyVal = document.getElementById('energyVal');
 const hungerFill = document.getElementById('hungerFill'), thirstFill = document.getElementById('thirstFill'), energyFill = document.getElementById('energyFill');
-const clickCount = document.getElementById('clickCount');
 
 /* connection UI */
 const connectionStatus = document.getElementById('connectionStatus'), roomCodeDisplay = document.getElementById('roomCodeDisplay');
@@ -320,8 +319,10 @@ const chatModal = document.getElementById('chatModal'), chatBox = document.getEl
 const chatInput = document.getElementById('chatInput'), chatSend = document.getElementById('chatSend'), chatClose = document.getElementById('chatClose');
 const chatClear = document.getElementById('chatClear'), chatRoomCode = document.getElementById('chatRoomCode');
 
-/* modals and controls */
+/* shop refs */
 const shopModal = document.getElementById('shopModal'), shopBox = document.getElementById('shopBox'), shopGrid = document.getElementById('shopGrid'), tierButtons = document.getElementById('tierButtons');
+
+/* other modals */
 const joinModal = document.getElementById('joinModal'), joinBox = document.getElementById('joinBox');
 
 let currentRoom = null;
@@ -331,7 +332,6 @@ let messagesUnsub = null;
 let isHost = false;
 let myPeerId = randomId();
 let localSeq = 0;
-const peerSeq = {};
 let writeTimer = null;
 const WRITE_DEBOUNCE_MS = 600;
 
@@ -411,14 +411,14 @@ function applyUI(){
   energyFill.style.width = clamp(state.energy) + '%';
   el('accountInfo').textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
   userInfo.textContent = user ? (user.displayName || user.email || 'You') : 'Not signed in';
-  el('clickCount') && (el('clickCount').textContent = state.totalClicks);
+  const clickCountEl = el('clickCount'); if(clickCountEl) clickCountEl.textContent = state.totalClicks || 0;
   gubbySprite.src = SPRITE_BASE_PATH + state.variant;
   if(state.pos && typeof state.pos.x === 'number') gubbySprite.style.left = state.pos.x + 'px';
   if(state.pos && typeof state.pos.y === 'number') gubbySprite.style.top = state.pos.y + 'px';
 }
 applyUI();
 
-/* ============== Firebase init & auth ============== */
+/* ================= FIREBASE init ================= */
 function initFirebase(){
   if(window.firebase && !db){
     firebase.initializeApp(firebaseConfig);
@@ -436,25 +436,31 @@ function initFirebase(){
           const profile = (await userRef.get()).data();
           if(profile?.privileges === 'admin') el('adminPanel').style.display = 'block';
           else el('adminPanel').style.display = 'none';
+          // load singleplayer from firestore if present (merge)
+          await loadSingleplayerFromServer();
         }catch(e){ console.warn('user doc check failed', e); }
       } else {
         signInBtn.style.display = 'inline-block';
         userInfo.textContent = 'Not signed in';
         el('adminPanel').style.display = 'none';
+        // when signed out, keep localStorage singleplayer if exists
+        state = loadState();
+        applyUI();
       }
-      applyUI();
     });
 
-    // variants + other collections
+    // variants live
     db.collection('variants').onSnapshot(snap => {
       const arr = snap.docs.map(d => ({ id:d.id, ...d.data() }));
       renderVariants(arr);
     });
 
+    window.__roomCache = null;
   }
 }
 initFirebase();
 
+/* sign-in */
 el('signInBtn').addEventListener('click', async ()=>{
   try{
     if(!db) initFirebase();
@@ -465,7 +471,77 @@ el('signInBtn').addEventListener('click', async ()=>{
 
 async function requireSignIn(){ if(!auth) initFirebase(); if(!auth.currentUser){ alert('Please sign in to use multiplayer.'); return false; } return true; }
 
-/* ============== ROOM: host/join/leave/listen ============== */
+/* ================= SINGLEPLAYER STORAGE ================= */
+/* singleplayer is stored at users/{uid}/singleplayerState (if signed in)
+   otherwise localStorage is used.
+*/
+async function loadSingleplayerFromServer(){
+  try{
+    if(!auth || !auth.currentUser) return;
+    const ref = db.collection('users').doc(auth.currentUser.uid).collection('singleplayerState').doc('state');
+    const snap = await ref.get();
+    if(snap.exists){
+      const docState = snap.data();
+      // merge server singleplayer into local
+      state = Object.assign({}, state, docState);
+      saveState();
+      applyUI();
+    } else {
+      // if none, create one from current local
+      await ref.set(state);
+    }
+  }catch(e){ console.warn('load singleplayer failed', e); }
+}
+
+async function saveSingleplayerToServer(){
+  try{
+    if(!auth || !auth.currentUser) return;
+    const ref = db.collection('users').doc(auth.currentUser.uid).collection('singleplayerState').doc('state');
+    await ref.set(state, { merge: true });
+  }catch(e){ console.warn('save singleplayer failed', e); }
+}
+
+/* helpers for owned items in singleplayer */
+async function getSingleplayerOwned(){
+  if(auth && auth.currentUser){
+    try{
+      const ref = db.collection('users').doc(auth.currentUser.uid).collection('singleplayerState').doc('state');
+      const snap = await ref.get();
+      if(snap.exists) return snap.data().shopOwned || [];
+    }catch(e){ console.warn('getSingleplayerOwned failed', e); }
+  }
+  // fallback to localStorage
+  try{
+    const raw = localStorage.getItem('gubby_single_owned');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return [];
+}
+async function addSingleplayerOwned(id){
+  if(auth && auth.currentUser){
+    try{
+      const ref = db.collection('users').doc(auth.currentUser.uid).collection('singleplayerState').doc('state');
+      await db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        const data = snap.exists ? snap.data() : {};
+        const owned = data.shopOwned || [];
+        if(!owned.includes(id)) owned.push(id);
+        if(!snap.exists) tx.set(ref, Object.assign({}, state, { shopOwned: owned }));
+        else tx.update(ref, { shopOwned: owned });
+      });
+      return;
+    }catch(e){ console.warn('addSingleplayerOwned failed', e); }
+  }
+  // local fallback
+  try{
+    const raw = localStorage.getItem('gubby_single_owned');
+    const arr = raw ? JSON.parse(raw) : [];
+    if(!arr.includes(id)) arr.push(id);
+    localStorage.setItem('gubby_single_owned', JSON.stringify(arr));
+  }catch(e){}
+}
+
+/* ================= ROOM: host/join/leave/listen ================= */
 function genCode(){
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   let s=''; for(let i=0;i<4;i++) s+=letters[Math.floor(Math.random()*letters.length)];
@@ -484,7 +560,6 @@ async function hostRoom(){
         isHost = true; currentRoom = code;
         const payload = { state: state, shopOwned: [], resetVotes: [], hostUid: auth.currentUser.uid, from: myPeerId, seq: ++localSeq, createdAt: Date.now() };
         await ref.set(payload);
-        // add member doc
         await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, displayName: auth.currentUser.displayName||auth.currentUser.email||'You', joinedAt: Date.now() });
         listenRoom(code);
         listenMembers(code);
@@ -538,6 +613,9 @@ async function leaveRoom(userRequested=true){
   copyRoomBtn.classList.add('hidden'); leaveRoomBtn.classList.add('hidden'); chatBtn.classList.add('hidden');
   connectionStatus.textContent = 'Not connected';
   membersEl.innerHTML = '';
+  // reload singleplayer local or server back into state
+  if(user) await loadSingleplayerFromServer(); else state = loadState();
+  applyUI();
 }
 
 function listenRoom(code){
@@ -547,12 +625,10 @@ function listenRoom(code){
     if(!snap.exists){ alert('Room closed'); leaveRoom(false); return; }
     const data = snap.data();
     if(!data) return;
-    // ignore echo from ourselves
-    const seq = Number(data.seq || 0), from = data.from;
+    const from = data.from;
     if(from !== myPeerId){
       if(data.state) mergeRemoteState(data.state);
     }
-    // store cached room snapshot for shop UI
     window.__roomCache = data;
     renderShopGrid(currentTier);
     updateResetStatus(data.resetVotes || []);
@@ -596,10 +672,14 @@ function updateRoomUI(connected, code){
   }
 }
 
-/* schedule/debounce writes */
+/* ============== SCHEDULED WRITES (room OR singleplayer) ============== */
 function scheduleWrite(){
   saveState(); applyUI();
-  if(!currentRoom) return;
+  if(!currentRoom){
+    // singleplayer: save to server if signed in or to localStorage
+    if(user) saveSingleplayerToServer().catch(e => console.warn('save singleplayer fail', e));
+    return;
+  }
   if(writeTimer) clearTimeout(writeTimer);
   writeTimer = setTimeout(()=> writeRoomNow(), WRITE_DEBOUNCE_MS);
 }
@@ -627,7 +707,7 @@ function mergeRemoteState(remote){
   saveState(); applyUI();
 }
 
-/* ============== SHOP UI & sync ============== */
+/* ============== SHOP UI & SYNC (handles singleplayer & multiplayer) ============== */
 function openShop(){
   el('shopModal').style.display='flex'; setTimeout(()=> el('shopBox').classList.add('show'), 10);
   renderTierButtons(); renderShopGrid(currentTier);
@@ -646,10 +726,16 @@ function renderTierButtons(){
   });
 }
 
-function renderShopGrid(tier){
+async function renderShopGrid(tier){
   shopGrid.innerHTML = '';
   const list = shopData.filter(s => s.tier === tier);
-  const owned = (window.__roomCache && window.__roomCache.shopOwned) || [];
+  let owned = [];
+  if(currentRoom && window.__roomCache){
+    owned = window.__roomCache.shopOwned || [];
+  } else {
+    // solo mode: read singleplayer owned
+    try{ owned = await getSingleplayerOwned(); }catch(e){ owned = []; }
+  }
   list.forEach(it => {
     const card = document.createElement('div'); card.className='shop-card';
     const ownedFlag = owned.includes(it.id);
@@ -673,10 +759,30 @@ function renderShopGrid(tier){
   });
 }
 
-/* buyItem via transaction that updates room.shopOwned and room.state.totalClicks */
+/* buyItem: handles singleplayer (user/local) and multiplayer (transaction) */
 async function buyItem(item){
-  if(!currentRoom) return alert('Join a room to buy (shop syncs in multiplayer).');
-  if(!user) return alert('Sign in to buy.');
+  // SINGLEPLAYER if not in a room
+  if(!currentRoom){
+    // deduct from player's personal clicks (state.totalClicks)
+    if(state.totalClicks < item.price) return alert('Not enough clicks in your singleplayer save.');
+    state.totalClicks -= item.price;
+    // apply simple effects
+    if(item.id === 'burger') state.backpack.food = (state.backpack.food||0) + 1;
+    if(item.id === 'waterbottle') state.backpack.water = (state.backpack.water||0) + 1;
+    if(item.id === 'clicker1') state.upgrades.clickPower = (state.upgrades.clickPower||1) + 1;
+    if(item.id === 'autoclick1') state.upgrades.autoClicks = (state.upgrades.autoClicks||0) + 1;
+    saveState(); applyUI();
+    // record ownership
+    try{
+      await addSingleplayerOwned(item.id);
+      alert('Purchased (singleplayer): ' + item.title);
+      renderShopGrid(currentTier);
+    }catch(e){ console.warn('singleplayer buy record failed', e); alert('Purchased locally, but failed to persist ownership.'); }
+    return;
+  }
+
+  // MULTIPLAYER: use a Firestore transaction to update room state & shopOwned
+  if(!user) return alert('Sign in to buy in multiplayer.');
   const roomRef = db.collection('rooms').doc(currentRoom);
   try{
     await db.runTransaction(async tx => {
@@ -684,29 +790,30 @@ async function buyItem(item){
       if(!snap.exists) throw new Error('Room missing');
       const data = snap.data();
       const owned = data.shopOwned || [];
-      if(owned.includes(item.id)) throw new Error('Already owned');
+      if(owned.includes(item.id)) throw new Error('Already owned in this room');
       const roomState = data.state || {};
       const totalClicks = Number(roomState.totalClicks || 0);
       if(totalClicks < item.price) throw new Error('Not enough room clicks balance');
       const newOwned = owned.concat([item.id]);
-      // apply item effects locally to our copy of state
-      const newState = Object.assign({}, state);
+      const newState = Object.assign({}, roomState);
       newState.totalClicks = totalClicks - item.price;
-      // simple item effects (some items are placeholders)
-      if(item.id === 'burger') newState.backpack = Object.assign({}, newState.backpack, { food: (newState.backpack.food||0)+1 });
-      if(item.id === 'waterbottle') newState.backpack = Object.assign({}, newState.backpack, { water: (newState.backpack.water||0)+1 });
-      if(item.id === 'clicker1') newState.upgrades = Object.assign({}, newState.upgrades, { clickPower: (newState.upgrades.clickPower||1)+1 });
-      if(item.id === 'autoclick1') newState.upgrades = Object.assign({}, newState.upgrades, { autoClicks: (newState.upgrades.autoClicks||0)+1 });
-      if(item.id === 'particle_accel') newState.upgrades = Object.assign({}, newState.upgrades, { clickPower: (newState.upgrades.clickPower||1)*1.5 });
-      // write back
+      // small sample effects
+      if(item.id === 'burger') newState.backpack = Object.assign({}, newState.backpack, { food: (newState.backpack?.food||0)+1 });
+      if(item.id === 'waterbottle') newState.backpack = Object.assign({}, newState.backpack, { water: (newState.backpack?.water||0)+1 });
+      if(item.id === 'clicker1') newState.upgrades = Object.assign({}, newState.upgrades, { clickPower: (newState.upgrades?.clickPower||1)+1 });
+      if(item.id === 'autoclick1') newState.upgrades = Object.assign({}, newState.upgrades, { autoClicks: (newState.upgrades?.autoClicks||0)+1 });
+      if(item.id === 'particle_accel') newState.upgrades = Object.assign({}, newState.upgrades, { clickPower: (newState.upgrades?.clickPower||1)*1.5 });
       tx.update(roomRef, { shopOwned: newOwned, state: newState, from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
-      // also update local state for immediate feedback
+      // update local copy for immediate feedback
       state = newState;
     });
     applyUI();
     renderShopGrid(currentTier);
     alert('Purchased ' + item.title);
-  }catch(e){ alert('Purchase failed: ' + (e.message || e)); }
+  }catch(e){
+    console.warn('purchase failed', e);
+    alert('Purchase failed: ' + (e.message || e));
+  }
 }
 
 /* ============== CHAT (messages subcollection) ============== */
@@ -726,7 +833,7 @@ chatBtn.addEventListener('click', openChat);
 
 function listenMessages(code){
   if(messagesUnsub) messagesUnsub();
-  const msgsRef = db.collection('rooms').doc(code).collection('messages').orderBy('createdAt','asc').limit(200);
+  const msgsRef = db.collection('rooms').doc(code).collection('messages').orderBy('createdAt','asc').limit(500);
   messagesUnsub = msgsRef.onSnapshot(snap => {
     chatMessages.innerHTML = '';
     snap.forEach(doc => {
@@ -737,7 +844,10 @@ function listenMessages(code){
       chatMessages.appendChild(elMsg);
     });
     chatMessages.scrollTop = chatMessages.scrollHeight;
-  }, err => console.warn('messages listen err', err));
+  }, err => {
+    console.warn('messages listen err', err);
+    alert('Chat listen error: ' + (err.message || err));
+  });
 }
 
 chatSend.addEventListener('click', sendChatMessage);
@@ -752,23 +862,25 @@ async function sendChatMessage(){
   try{
     await msgsRef.add({ uid: auth.currentUser.uid, name: auth.currentUser.displayName || auth.currentUser.email || 'You', text, createdAt: Date.now() });
     chatInput.value = '';
-  }catch(e){ console.warn('send chat failed', e); alert('Failed to send message'); }
+  }catch(e){
+    console.warn('send chat failed', e);
+    // show clearer permission diagnostics
+    alert('Send chat failed: ' + (e.message || e) + '\nCheck Firestore rules to allow authenticated users to write to rooms/messages.');
+  }
 }
 
 chatClear.addEventListener('click', async ()=>{
+  if(!currentRoom) return alert('Join a room first');
   if(!confirm('Clear chat for everyone in this room?')) return;
-  if(!currentRoom) return;
+  if(!auth || !auth.currentUser) return alert('Sign in required');
   try{
-    // only allow if authenticated
-    if(!auth.currentUser) return alert('Sign in required');
-    // delete messages in batches
     const msgsRef = db.collection('rooms').doc(currentRoom).collection('messages');
     const snap = await msgsRef.get();
     const batch = db.batch();
-    snap.forEach(doc => batch.delete(doc.ref));
+    snap.forEach(d => batch.delete(d.ref));
     await batch.commit();
     alert('Chat cleared');
-  }catch(e){ console.warn('clear chat failed', e); alert('Clear chat failed'); }
+  }catch(e){ console.warn('clear chat failed', e); alert('Clear chat failed: ' + (e.message||e)); }
 });
 
 /* ============== RESET: unanimous votes and clearing chat ============== */
@@ -788,45 +900,42 @@ el('resetAgree').addEventListener('click', async ()=>{
       const data = snap.data();
       const resetVotes = new Set(data.resetVotes || []);
       resetVotes.add(auth.currentUser.uid);
-      // read member docs
       const membersSnap = await roomRef.collection('members').get();
       const memberIds = [];
       membersSnap.forEach(m => memberIds.push(m.id));
-      if(memberIds.length === 0) {
-        // if no members, just reset immediately
+      if(memberIds.length === 0){
         tx.update(roomRef, { state: defaultState, resetVotes: [], shopOwned: [], from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
       } else if(memberIds.every(id => resetVotes.has(id))){
-        // everyone agreed -> reset state & clear votes & shopOwned
         tx.update(roomRef, { state: defaultState, resetVotes: [], shopOwned: [], from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
       } else {
-        // record vote
         tx.update(roomRef, { resetVotes: Array.from(resetVotes), from: myPeerId, seq: ++localSeq, lastUpdated: Date.now() });
       }
     });
-    // after transaction, if reset occurred we should also clear messages subcollection (non-transaction)
-    // check if resetVotes was cleared by reading doc
+
+    // after transaction, check if reset occurred and clear messages
     const doc = await roomRef.get();
     const dataAfter = doc.data();
     if(dataAfter && Array.isArray(dataAfter.resetVotes) && dataAfter.resetVotes.length === 0){
-      // clear messages
+      // clear messages (batched)
       try{
         const msgsRef = roomRef.collection('messages');
         const snap = await msgsRef.get();
-        const batchArray = [];
         if(!snap.empty){
+          const batches = [];
           let batch = db.batch(), ops = 0;
-          snap.forEach(d => { batch.delete(d.ref); ops++; if(ops === 500){ batchArray.push(batch); batch = db.batch(); ops = 0; } });
-          batchArray.push(batch);
-          for(const b of batchArray) await b.commit();
+          snap.forEach(d => { batch.delete(d.ref); ops++; if(ops === 500){ batches.push(batch); batch = db.batch(); ops = 0; } });
+          batches.push(batch);
+          for(const b of batches) await b.commit();
         }
       }catch(e){ console.warn('post-reset message deletion failed', e); }
     }
+
     el('resetBox').classList.remove('show'); setTimeout(()=> el('resetModal').style.display='none',180);
     alert('Your vote was recorded. Reset happens when all members agree. Chat will be cleared if reset occurs.');
   }catch(e){ console.warn('reset tx failed', e); alert('Reset failed: ' + (e.message||e)); }
 });
 
-/* update reset status UI (x of y agreed) */
+/* update reset status UI */
 async function updateResetStatus(votes){
   if(!currentRoom){ el('resetStatus').textContent = ''; return; }
   try{
@@ -836,7 +945,7 @@ async function updateResetStatus(votes){
   }catch(e){ el('resetStatus').textContent = `${(votes||[]).length} votes`; }
 }
 
-/* ============== Game actions, loops ============== */
+/* ============== GAME: clicks, items, decay ============== */
 function clickGubby(){
   if(!state.alive) return;
   if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
@@ -908,7 +1017,7 @@ el('restartBtn').addEventListener('click', ()=> {
   saveState(); applyUI(); hideGameOver();
 });
 
-/* ============== Variants admin ============== */
+/* ============== VARIANTS admin ============== */
 function renderVariants(items){
   const wrap = el('variantsList'); wrap.innerHTML = '';
   items.forEach(v=>{
@@ -981,7 +1090,6 @@ document.addEventListener('DOMContentLoaded', ()=> {
   el('chatClear').addEventListener('click', async ()=> {
     if(!currentRoom) return alert('Join a room first');
     if(!confirm('Clear chat for everyone?')) return;
-    // delete messages
     try{
       const msgsRef = db.collection('rooms').doc(currentRoom).collection('messages');
       const snap = await msgsRef.get();
@@ -989,7 +1097,7 @@ document.addEventListener('DOMContentLoaded', ()=> {
       snap.forEach(d => batch.delete(d.ref));
       await batch.commit();
       alert('Chat cleared');
-    }catch(e){ console.warn('clear failed', e); alert('Clear failed'); }
+    }catch(e){ console.warn('clear failed', e); alert('Clear failed: ' + (e.message||e)); }
   });
   el('resetBtn').addEventListener('click', ()=> { if(!currentRoom) return alert('Join a room first'); el('resetModal').style.display='flex'; setTimeout(()=> el('resetBox').classList.add('show'),10); });
 });
@@ -997,7 +1105,7 @@ document.addEventListener('DOMContentLoaded', ()=> {
 /* expose debug */
 window.GubbyClicker = { state, saveState, loadState, openShop, hostRoom, joinRoom, leaveRoom };
 
-/* end of script */
-  </script>
+/* End of script */
+</script>
 </body>
 </html>
