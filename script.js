@@ -2,9 +2,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, increment, serverTimestamp, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("Script loaded and running. DOM is ready.");
+// This alert is for debugging. If you see this, the script is running.
+alert("Gubby Clicker Script Loaded!");
 
+document.addEventListener('DOMContentLoaded', () => {
+    
     // 1. --- FIREBASE CONFIGURATION ---
     const firebaseConfig = {
         apiKey: "AIzaSyAai5V9VTtPnAdMoAhhVe94fobPOY25yf8",
