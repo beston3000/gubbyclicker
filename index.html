@@ -70,8 +70,11 @@
     .shop-tab.active{color:var(--accent);background:var(--bg);border-color:#e2e8f0; border-bottom-color: var(--bg);}
     .tab-content{display:none;}
     .tab-content.active{display:block;}
-    input[type="text"] { border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 8px; font-size: 14px; }
-    input[type="text"]:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    input[type="text"], input[type="number"], select { width: 100%; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 8px; font-size: 14px; background: white; }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    #attributesList { list-style-type: none; padding: 0; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    #attributesList li { background: var(--bg-2); padding: 8px 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -132,14 +135,53 @@
         </div>
 
         <div class="card" id="adminPanel" style="display:none">
-          <strong>Admin</strong>
-          <div class="small" style="margin-top:8px">Create variants (modifiers) — quick UI</div>
+          <strong>Admin Panel</strong>
+          <div class="small" style="margin-top:8px">Create new Gubby variants.</div>
+          <div style="display:flex; flex-direction:column; gap: 12px; margin-top:12px;">
+              <div class="form-group">
+                  <label class="small" for="variantFileName">File Name (e.g., gold.png)</label>
+                  <input type="text" id="variantFileName" placeholder="unique-id.png">
+              </div>
+              <div class="form-group">
+                  <label class="small" for="variantName">Variant Name</label>
+                  <input type="text" id="variantName" placeholder="Golden Gubby">
+              </div>
+              <div class="form-group">
+                  <label class="small" for="variantPrice">Price (Clicks)</label>
+                  <input type="number" id="variantPrice" placeholder="5000">
+              </div>
+              <button id="buildAttributesBtn" class="btn secondary">Add/Edit Attributes</button>
+              <button id="addVariantBtn" class="btn" style="margin-top:8px;">Add Variant</button>
+          </div>
         </div>
       </div>
     </div>
 
     <footer class="small" style="text-align:center">Gubby Clicker — Firestore rooms · 50+ shop items</footer>
   </div>
+  
+  <!-- Attribute Builder Modal -->
+  <div class="modal-backdrop" id="attributeBuilderModal"><div class="modal" id="attributeBuilderBox">
+    <h3>Build Attributes</h3>
+    <div style="display:flex; flex-direction:column; gap: 16px; margin-top:12px;">
+        <div class="form-group">
+            <label for="attributeType" class="small">Attribute Type</label>
+            <select id="attributeType"></select>
+        </div>
+        <div class="form-group">
+            <label for="attributeValue" class="small">Value</label>
+            <input type="number" id="attributeValue" placeholder="e.g., 1.5">
+        </div>
+        <button id="addAttribute" class="btn secondary">Add Attribute</button>
+        <div>
+            <p class="small">Current Attributes:</p>
+            <ul id="attributesList"></ul>
+        </div>
+    </div>
+    <div class="modal-actions">
+        <button id="applyAttributes" class="btn">Apply & Close</button>
+    </div>
+  </div></div>
 
   <!-- Multiplayer Modal -->
   <div class="modal-backdrop" id="multiplayerModal"><div class="modal" id="multiplayerBox">
@@ -273,16 +315,17 @@
     pos:{x:340,y:220},
     hunger:80, thirst:80, energy:100, alive:true,
     clicks:0, totalClicks:0,
-    upgrades:{clickPower:1, autoClicks:0, multipliers:[]},
+    upgrades:{clickPower:1, autoClicks:0},
     backpack:{ food:5, water:5, cola:2 },
     lastUpdated: Date.now()
   };
   let state = loadLocalState(); // working copy
-  let user = null, auth = null, db = null;
+  let user = null, auth = null, db = null, userData = null;
   let currentRoom = null, roomUnsub=null, membersUnsub=null, messagesUnsub=null;
   let myId = randomId(), writeTimer=null;
   const WRITE_DEBOUNCE_MS = 600;
   let variantsData = [];
+  let tempAttributes = {};
 
   // ================= SHOP DATA =================
   const upgradesData = [
@@ -294,28 +337,14 @@
     {id:'auto_feeder2', title:'Auto-Feeder Mk II', price:2400, desc:'+5 auto clicks'},
     {id:'bed', title:'Cozy Bed', price:350, desc:'Energy recovers faster'},
     {id:'mini_farm', title:'Mini Farm', price:2200, desc:'Generates food slowly'},
-    {id:'garden', title:'Garden', price:750, desc:'Auto grow snacks'},
-    {id:'neon_sign', title:'Neon Gubby Sign', price:700, desc:'Stylish'},
-    {id:'lux_cushion', title:'Luxury Cushion', price:900, desc:'Comfort'},
-    {id:'fountain', title:'Fountain', price:650, desc:'Relaxing water feature'},
-    {id:'trainer', title:'Personal Trainer', price:1200, desc:'+2 energy during day'},
-    {id:'fancy_plate', title:'Fancy Plate', price:1100, desc:'Fine dining'},
-    {id:'mystic_hat', title:'Mystic Hat', price:1300, desc:'Looks mysterious'},
-    {id:'zen_garden', title:'Zen Garden', price:1400, desc:'Relaxation'},
-    {id:'orb', title:'Mystic Orb', price:4200, desc:'Weird energies'},
-    {id:'quantum_seed', title:'Quantum Seed', price:5200, desc:'Grows unpredictable snacks'},
-    {id:'time_clock', title:'Time Clock', price:12000, desc:'Time-warping clock'},
   ];
   const storeData = [
     {id:'burger', title:'Burger', price:25, desc:'Food +1'},
     {id:'waterbottle', title:'Water Bottle', price:20, desc:'Water +1'},
-    {id:'ball', title:'Bouncy Ball', price:50, desc:'Play toy'},
-    {id:'snackbox', title:'Snack Box', price:180, desc:'Mixed snacks'},
     {id:'soda_pack', title:'Cola Pack', price:350, desc:'+2 Cola'},
-    {id:'plushie', title:'Plushie', price:200, desc:'Cute friend'},
-    {id:'toy2', title:'Squeaky Toy', price:120, desc:'Play toy'},
-    {id:'treats', title:'Treats (10)', price:300, desc:'Bulk snacks'},
   ];
+  const possibleAttributes = ['clickMultiplier', 'autoClickRate', 'hungerDecayMod', 'thirstDecayMod', 'energyGainMod'];
+
 
   // ================= UTIL =================
   function el(id){ return document.getElementById(id); }
@@ -365,6 +394,12 @@
     el('gubbySprite').src = 'sprites/variants/' + (state.variant || 'default.png');
     el('accountInfo').textContent = user ? (user.displayName || user.email) : 'Not signed in';
     el('authArea').textContent = user ? (user.displayName || user.email) : 'Not signed in';
+    
+    if (userData && userData.privileges === 'admin') {
+        el('adminPanel').style.display = 'block';
+    } else {
+        el('adminPanel').style.display = 'none';
+    }
   }
 
   // ================= FIREBASE INIT =================
@@ -379,18 +414,30 @@
           user = u;
           if(user){
             el('signInBtn').style.display = 'none';
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
+                userData = userDoc.data();
+            } else {
+                await db.collection('users').doc(user.uid).set({
+                    displayName: user.displayName,
+                    email: user.email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                userData = { privileges: '' };
+            }
             await loadSingleplayerFromServer().catch(()=>{});
           } else {
             el('signInBtn').style.display = 'inline-block';
             state = loadLocalState();
+            userData = null;
           }
           applyUI();
         });
 
         db.collection('variants').onSnapshot(snap => {
-          variantsData = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+          variantsData = snap.docs.map(d => ({ docId: d.id, ...d.data().attributes }));
           renderVariantsShop();
-        }, ()=>{});
+        }, (err) => { console.error("Variant listener failed:", err)});
 
       }
     }catch(e){
@@ -651,8 +698,8 @@
     const owned = getOwnedItems();
     variantsData.forEach(item => {
       const card = document.createElement('div'); card.className='shop-card';
-      const isOwned = owned.includes(item.id);
-      card.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${item.title}</strong><div class="small">${item.desc || 'A new look for Gubby!'}</div></div><div style="text-align:right"><div class="small">${item.price || 500} ✨</div></div></div>
+      const isOwned = owned.includes(item.fileName);
+      card.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${item.id}</strong><div class="small">${item.desc || 'A new look for Gubby!'}</div></div><div style="text-align:right"><div class="small">${item.price || 500} ✨</div></div></div>
         <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:8px"><div><button class="btn small ${isOwned?'ghost':''}" ${isOwned?'disabled':''}>${isOwned?'Owned':'Buy'}</button></div></div>`;
       const btn = card.querySelector('button');
       btn.addEventListener('click', ()=> buyItem(item, 'variant'));
@@ -673,7 +720,7 @@
   }
 
   async function buyItem(item, type){
-    const price = item.price || 500; // Default price for variants if not set
+    const price = item.price || 500;
     if (state.totalClicks < price) return showNotification('Not enough clicks.');
 
     if (type === 'consumable') {
@@ -686,18 +733,20 @@
         return;
     }
     
+    const itemId = type === 'variant' ? item.fileName : item.id;
+
     if(!currentRoom){
       const owned = getOwnedItems();
-      if (owned.includes(item.id)) return showNotification("You already own this item.");
+      if (owned.includes(itemId)) return showNotification("You already own this item.");
       state.totalClicks -= price;
       
-      if (type === 'variant') state.variant = item.id;
+      if (type === 'variant') state.variant = item.fileName;
       if (item.id === 'clicker1') state.upgrades.clickPower = (state.upgrades.clickPower||1)+1;
       
-      owned.push(item.id);
+      owned.push(itemId);
       localStorage.setItem('gubby_single_owned', JSON.stringify(owned));
       scheduleWrite();
-      showNotification(`Purchased (singleplayer): ${item.title}`);
+      showNotification(`Purchased (singleplayer): ${item.title || item.id}`);
       renderUpgradesShop();
       renderVariantsShop();
       return;
@@ -711,26 +760,97 @@
         if(!snap.exists) throw new Error('Room missing');
         const data = snap.data();
         const owned = data.shopOwned || [];
-        if(owned.includes(item.id)) throw new Error('Already owned by someone in the room');
+        if(owned.includes(itemId)) throw new Error('Already owned by someone in the room');
         const roomState = data.state || {};
         const totalClicks = Number(roomState.totalClicks || 0);
         if(totalClicks < price) throw new Error('Not enough room clicks');
         
-        const newOwned = owned.concat([item.id]);
+        const newOwned = owned.concat([itemId]);
         const newState = Object.assign({}, roomState);
         newState.totalClicks = totalClicks - price;
 
-        if (type === 'variant') newState.variant = item.id;
+        if (type === 'variant') newState.variant = item.fileName;
         if (item.id === 'clicker1') newState.upgrades = Object.assign({}, newState.upgrades || {}, { clickPower: (newState.upgrades?.clickPower||1)+1 });
 
         tx.update(roomRef, { shopOwned: newOwned, state: newState, lastUpdated: Date.now() });
       });
-      showNotification('Purchased ' + item.title);
+      showNotification('Purchased ' + (item.title || item.id));
     }catch(e){
       console.warn('purchase failed', e);
       showNotification('Purchase failed: ' + (e.message || e));
     }
   }
+  
+  // ================= ADMIN ACTIONS =================
+  el('buildAttributesBtn').addEventListener('click', () => {
+      openModal('attributeBuilderModal', 'attributeBuilderBox');
+  });
+  
+  function renderAttributeBuilder() {
+      const list = el('attributesList');
+      list.innerHTML = '';
+      for (const key in tempAttributes) {
+          const li = document.createElement('li');
+          li.innerHTML = `<span><strong>${key}:</strong> ${tempAttributes[key]}</span> <button class="btn ghost small" data-key="${key}">X</button>`;
+          list.appendChild(li);
+      }
+      list.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+              delete tempAttributes[e.target.dataset.key];
+              renderAttributeBuilder();
+          });
+      });
+  }
+  
+  el('addAttribute').addEventListener('click', () => {
+      const type = el('attributeType').value;
+      const value = parseFloat(el('attributeValue').value);
+      if (!type || isNaN(value)) {
+          return showNotification('Please select an attribute and enter a valid number.', 'Invalid Input');
+      }
+      tempAttributes[type] = value;
+      el('attributeValue').value = '';
+      renderAttributeBuilder();
+  });
+  
+  el('applyAttributes').addEventListener('click', () => {
+      closeModal('attributeBuilderModal', 'attributeBuilderBox');
+      showNotification('Attributes ready to be saved with the new variant.', 'Attributes Set');
+  });
+
+  el('addVariantBtn').addEventListener('click', async () => {
+      const fileName = el('variantFileName').value.trim();
+      const id = el('variantName').value.trim();
+      const price = Number(el('variantPrice').value);
+
+      if (!fileName || !id || !price) {
+          return showNotification('Please fill out all fields for the new variant.', 'Missing Information');
+      }
+      
+      const newVariant = {
+          attributes: {
+              ...tempAttributes, // Add the dynamically built attributes
+              createdAt: Date.now(),
+              createdBy: user.uid,
+              fileName: fileName,
+              id: id,
+              price: price
+          }
+      };
+
+      try {
+          await db.collection('variants').doc(fileName).set(newVariant);
+          showNotification(`Successfully added variant: ${id}`, 'Variant Added');
+          el('variantFileName').value = '';
+          el('variantName').value = '';
+          el('variantPrice').value = '';
+          tempAttributes = {}; // Reset for next time
+      } catch (e) {
+          console.error("Error adding variant: ", e);
+          showNotification('Failed to add variant. Check console for errors.', 'Error');
+      }
+  });
+
 
   // ================= CHAT =================
   el('chatOpenBtn').addEventListener('click', ()=>openModal('chatModal', 'chatBox'));
@@ -754,7 +874,7 @@
   });
 
   function listenMessages(code){
-    if(messagesUnsub) messagesUnsub();
+    if(messagesUnsub) messagesUnsub=null;
     const msgsRef = db.collection('rooms').doc(code).collection('messages').orderBy('createdAt','asc').limit(500);
     messagesUnsub = msgsRef.onSnapshot(snap => {
       const container = el('chatMessages'); container.innerHTML = '';
@@ -841,12 +961,19 @@
     });
   }
 
-  // ================= MOVEMENT / DECAY / LOOP =================
+  // ================= GAME LOGIC & LOOP =================
+  function getActiveVariantMultiplier() {
+      if (!state.variant || state.variant === 'default.png') return 1;
+      const currentVariant = variantsData.find(v => v.fileName === state.variant);
+      return currentVariant?.clickMultiplier || 1;
+  }
+
   el('gubbySprite').addEventListener('click', ()=> {
     if(!state.alive) return;
-    const mult = (state.upgrades.multipliers || []).reduce((a,b)=>a*b,1) || 1;
-    const power = (state.upgrades.clickPower || 1) * mult;
-    state.clicks += power; state.totalClicks += power;
+    const variantMultiplier = getActiveVariantMultiplier();
+    const power = (state.upgrades.clickPower || 1) * variantMultiplier;
+    state.clicks += power;
+    state.totalClicks += power;
     state.hunger = Math.max(0, state.hunger - 0.1);
     state.thirst = Math.max(0, state.thirst - 0.2);
     scheduleWrite();
@@ -871,12 +998,22 @@
 
   setInterval(()=>{
     if(!state.alive) return;
-    state.hunger = Math.max(0, state.hunger - 0.5);
-    state.thirst = Math.max(0, state.thirst - 0.6);
+    const currentVariant = variantsData.find(v => v.fileName === state.variant);
+    const hungerDecay = currentVariant?.hungerDecayMod || 0.5;
+    const thirstDecay = currentVariant?.thirstDecayMod || 0.6;
+    const energyGain = currentVariant?.energyGainMod || 1;
+    
+    state.hunger = Math.max(0, state.hunger - hungerDecay);
+    state.thirst = Math.max(0, state.thirst - thirstDecay);
+    
     const hour = (new Date()).getHours();
-    if(hour>=22||hour<7) state.energy = Math.min(100, state.energy + 1); else state.energy = Math.max(0, state.energy - 0.2);
+    if(hour>=22||hour<7) state.energy = Math.min(100, state.energy + energyGain); else state.energy = Math.max(0, state.energy - 0.2);
     if(state.hunger === 0 || state.thirst === 0) state.energy = Math.max(0, state.energy - 1);
-    if(state.upgrades.autoClicks > 0) { state.clicks += state.upgrades.autoClicks; state.totalClicks += state.upgrades.autoClicks; }
+    
+    const autoClickRate = currentVariant?.autoClickRate || 0;
+    state.clicks += state.upgrades.autoClicks + autoClickRate;
+    state.totalClicks += state.upgrades.autoClicks + autoClickRate;
+
     if(state.energy <= 0 || state.hunger <= 0 || state.thirst <= 0){
       state.alive = false; scheduleWrite(); showGameOver();
     }
@@ -928,6 +1065,15 @@
     }catch(e){}
   });
 
+  // Initial population of attribute dropdown
+  const attributeSelect = el('attributeType');
+  possibleAttributes.forEach(attr => {
+      const option = document.createElement('option');
+      option.value = attr;
+      option.textContent = attr;
+      attributeSelect.appendChild(option);
+  });
+  
   applyUI();
   window.GubbyClicker = { state, saveLocalState, loadLocalState, hostRoom, joinRoom, leaveRoom };
   </script>
