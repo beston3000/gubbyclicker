@@ -94,6 +94,7 @@
         <button id="signInBtn" class="btn secondary">Sign in</button>
         <button id="upgradesOpenBtn" class="btn secondary">Upgrades</button>
         <button id="storeOpenBtn" class="btn">Store</button>
+        <button id="roomBtn" class="btn secondary" style="display:none;">Room</button>
       </div>
     </header>
 
@@ -190,7 +191,7 @@
   <div class="modal-backdrop" id="multiplayerModal"><div class="modal" id="multiplayerBox">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <h3 style="margin:0">Multiplayer Room</h3>
-        <button id="leaveRoom" class="btn ghost">Leave</button>
+        <button id="closeMultiplayerBtn" class="btn ghost">Close</button>
       </div>
       <div style="margin-top:16px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -211,6 +212,7 @@
               <div style="display:flex; gap: 8px; margin-top: 8px;">
                 <button id="chatOpenBtn" class="btn secondary">💬 Chat</button>
                 <button id="resetBtn" class="btn ghost">Request Reset</button>
+                <button id="leaveRoomBtn" class="btn ghost" style="color: #ef4444;">Leave Room</button>
               </div>
               <div style="margin-top:8px"><div id="resetStatus" class="small"></div></div>
           </div>
@@ -1094,12 +1096,14 @@
   el('joinBtn').addEventListener('click', ()=> openModal('joinModal', 'joinBox'));
   el('joinCancel').addEventListener('click', ()=> closeModal('joinModal', 'joinBox'));
   el('joinConfirm').addEventListener('click', ()=> { const code = el('joinCode').value.trim(); closeModal('joinModal', 'joinBox'); if(code) joinRoom(code); });
-  el('leaveRoom').addEventListener('click', ()=> { 
+  el('leaveRoomBtn').addEventListener('click', ()=> { 
       showNotification('Are you sure you want to leave the room?', 'Confirm Leave', [
           { text: 'Leave', class: 'btn', onClick: leaveRoom },
           { text: 'Stay', class: 'btn secondary' }
       ]);
   });
+  el('closeMultiplayerBtn').addEventListener('click', () => closeModal('multiplayerModal', 'multiplayerBox'));
+  el('roomBtn').addEventListener('click', () => openModal('multiplayerModal', 'multiplayerBox'));
   el('copyRoom').addEventListener('click', ()=> { if(!currentRoom) return; navigator.clipboard?.writeText(currentRoom).then(()=>showNotification('Room code copied!'), ()=>showNotification('Could not copy code.')); });
 
   // ================= ROOM UI APPLY =================
@@ -1109,10 +1113,12 @@
       document.body.classList.add('room-mode');
       el('connectionStatus').textContent = 'Connected';
       el('roomCode').textContent = code;
+      el('roomBtn').style.display = 'inline-block';
       openModal('multiplayerModal', 'multiplayerBox');
       listenMessages(code);
     } else {
       document.body.classList.remove('room-mode');
+      el('roomBtn').style.display = 'none';
       closeModal('multiplayerModal', 'multiplayerBox');
     }
   }
