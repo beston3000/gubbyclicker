@@ -41,9 +41,11 @@
         position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:140px;height:140px;pointer-events:auto;cursor:pointer;
         -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
         -webkit-user-drag: none; -khtml-user-drag: none; -moz-user-drag: none; -o-user-drag: none; user-drag: none;
-        transition: all 1s ease-in-out;
+        transition: all 1s ease-in-out, transform 0.1s ease-in-out;
     }
-    .gubby:active { transform: translate(-50%, -50%) scale(0.95); }
+    .gubby.clicked {
+        transform: translate(-50%, -50%) scale(1.1);
+    }
     .stats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
     .stat{min-width:160px;background:white;border-radius:10px;padding:12px;border:1px solid #e2e8f0;text-align:center}
     .stat .label{font-size:12px;color:var(--muted); font-weight: 500;}
@@ -970,12 +972,17 @@
   
   function playClickSound() {
       try {
-          new Audio('../sounds/merp.mp3').play().catch(()=>{});
+          new Audio('sounds/merp.mp3').play().catch(()=>{});
       } catch(e) { console.warn("Could not play sound", e); }
   }
 
   el('gubbySprite').addEventListener('click', ()=> {
     if(!state.alive) return;
+    
+    const gubby = el('gubbySprite');
+    gubby.classList.add('clicked');
+    setTimeout(() => gubby.classList.remove('clicked'), 100);
+
     playClickSound();
     const variantMultiplier = getActiveVariantMultiplier();
     const power = (state.upgrades.clickPower || 1) * variantMultiplier;
