@@ -41,7 +41,7 @@
         position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:140px;height:140px;pointer-events:auto;cursor:pointer;
         -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
         -webkit-user-drag: none; -khtml-user-drag: none; -moz-user-drag: none; -o-user-drag: none; user-drag: none;
-        transition: transform 0.2s ease;
+        transition: all 1s ease-in-out;
     }
     .gubby:active { transform: translate(-50%, -50%) scale(0.95); }
     .stats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
@@ -967,9 +967,16 @@
       const currentVariant = variantsData.find(v => v.fileName === state.variant);
       return currentVariant?.clickMultiplier || 1;
   }
+  
+  function playClickSound() {
+      try {
+          new Audio('../sounds/merp.mp3').play().catch(()=>{});
+      } catch(e) { console.warn("Could not play sound", e); }
+  }
 
   el('gubbySprite').addEventListener('click', ()=> {
     if(!state.alive) return;
+    playClickSound();
     const variantMultiplier = getActiveVariantMultiplier();
     const power = (state.upgrades.clickPower || 1) * variantMultiplier;
     state.clicks += power;
