@@ -511,6 +511,7 @@
         const snap = await ref.get();
         if(!snap.exists){
           currentRoom = code;
+          // When creating the room, set the host's UID. This is critical for the host-authoritative game loop.
           await ref.set({ state: state, shopOwned: [], resetVotes: [], hostUid: auth.currentUser.uid, lastUpdated: Date.now() });
           await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, name: auth.currentUser.displayName||auth.currentUser.email, joinedAt: Date.now() });
           listenRoom(code);
@@ -564,7 +565,8 @@
       }
     }catch(e){ console.warn('leave room db cleanup failed', e); }
   }
-
+  
+  // ================= ROOM LISTENERS & STATE SYNC =================
   function listenRoom(code){
     if(roomUnsub) roomUnsub();
     const ref = db.collection('rooms').doc(code);
@@ -576,8 +578,17 @@
       }
       const data = doc.data();
       if(!data) return;
-      if(data.state) mergeRemoteState(data.state);
+      
+      // The onSnapshot listener is the source of truth.
+      // When data arrives, we update the local state to match the server.
+      if(data.state) {
+          state = data.state;
+          applyUI();
+      }
+      
+      // Cache the full room data locally for quick access (e.g., checking host UID).
       window.__roomCache = data;
+      
       updateResetStatus(data.resetVotes || []);
       renderUpgradesShop();
       renderVariantsShop();
@@ -594,76 +605,51 @@
     }, err => console.warn('members listen err', err));
   }
 
-  // ================= MERGE / WRITE SCHEDULING =================
+  // ================= WRITE SCHEDULING (Singleplayer Only) =================
   function scheduleWrite(){
     saveLocalState();
     applyUI();
-    if(!currentRoom){
-      if(user) saveSingleplayerToServer().catch(()=>{});
-      return;
+    // Only save to server for singleplayer. Multiplayer is handled by transactions.
+    if(!currentRoom && user){
+      if(writeTimer) clearTimeout(writeTimer);
+      writeTimer = setTimeout(()=> saveSingleplayerToServer(), WRITE_DEBOUNCE_MS);
     }
-    if(writeTimer) clearTimeout(writeTimer);
-    writeTimer = setTimeout(()=> writeRoomNow(), WRITE_DEBOUNCE_MS);
   }
 
-  function writeRoomNow(){
-    if(!currentRoom) return;
-    const ref = db.collection('rooms').doc(currentRoom);
-    const payload = { state: state, from: myId, lastUpdated: Date.now() };
-    ref.set(payload, { merge:true }).catch(e => console.warn('write failed', e));
-  }
+  // ================= SINGLEPLAYER ACTIONS =================
+  el('singleplayerResetBtn').addEventListener('click', () => {
+      showNotification('Are you sure you want to reset your single-player save? This cannot be undone.', 'Confirm Reset', [
+          { text: 'Reset', class: 'btn', onClick: () => {
+              state = JSON.parse(JSON.stringify(defaultState));
+              localStorage.removeItem('gubby_single_owned');
+              saveLocalState();
+              if (user) saveSingleplayerToServer();
+              applyUI();
+              showNotification('Your single-player game has been reset.', 'Success');
+          }},
+          { text: 'Cancel', class: 'btn secondary' }
+      ]);
+  });
 
-  function mergeRemoteState(remote){
-    if(!remote) return;
-    if(remote.totalClicks > (state.totalClicks||0)){
-      state.totalClicks = remote.totalClicks;
-      state.upgrades = remote.upgrades || state.upgrades;
-      state.variant = remote.variant || state.variant;
-    }
-    state.backpack.food = Math.max(state.backpack.food||0, remote.backpack?.food||0);
-    state.backpack.water = Math.max(state.backpack.water||0, remote.backpack?.water||0);
-    state.backpack.cola = Math.max(state.backpack.cola||0, remote.backpack?.cola||0);
-    state.hunger = Math.round((state.hunger + (remote.hunger||state.hunger))/2);
-    state.thirst = Math.round((state.thirst + (remote.thirst||state.thirst))/2);
-    state.energy = Math.round((state.energy + (remote.energy||state.energy))/2);
-    state.happiness = Math.round((state.happiness + (remote.happiness||state.happiness))/2);
-    saveLocalState(); applyUI();
-  }
-  
-    // ================= SINGLEPLAYER ACTIONS =================
-    el('singleplayerResetBtn').addEventListener('click', () => {
-        showNotification('Are you sure you want to reset your single-player save? This cannot be undone.', 'Confirm Reset', [
-            { text: 'Reset', class: 'btn', onClick: () => {
-                state = JSON.parse(JSON.stringify(defaultState));
-                localStorage.removeItem('gubby_single_owned');
-                saveLocalState();
-                if (user) saveSingleplayerToServer();
-                applyUI();
-                showNotification('Your single-player game has been reset.', 'Success');
-            }},
-            { text: 'Cancel', class: 'btn secondary' }
-        ]);
-    });
+  el('downloadSaveBtn').addEventListener('click', () => {
+      try {
+          const saveData = JSON.stringify({ state: state, owned: JSON.parse(localStorage.getItem('gubby_single_owned') || '[]') }, null, 2);
+          const blob = new Blob([saveData], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'gubby-save.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+      } catch (e) {
+          console.error('Failed to download save file', e);
+          showNotification('Could not download save file.', 'Error');
+      }
+  });
 
-    el('downloadSaveBtn').addEventListener('click', () => {
-        try {
-            const saveData = JSON.stringify({ state: state, owned: JSON.parse(localStorage.getItem('gubby_single_owned') || '[]') }, null, 2);
-            const blob = new Blob([saveData], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'gubby-save.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (e) {
-            console.error('Failed to download save file', e);
-            showNotification('Could not download save file.', 'Error');
-        }
-    });
-
-  // ================= SHOPS UI & BUY =================
+  // ================= SHOPS UI & BUY LOGIC (MULTIPLAYER SYNCED) =================
   function openModal(modalId, boxId) {
       el(modalId).style.display = 'flex';
       setTimeout(()=> el(boxId).classList.add('show'), 10);
@@ -750,64 +736,89 @@
 
   async function buyItem(item, type){
     const price = item.price || 500;
-    if (state.totalClicks < price) return showNotification('Not enough clicks.');
-
-    if (type === 'consumable') {
+    
+    // SINGLEPLAYER LOGIC
+    if (!currentRoom) {
+        if (state.totalClicks < price) return showNotification('Not enough clicks.');
         state.totalClicks -= price;
-        if(item.id === 'burger') state.backpack.food = (state.backpack.food||0)+1;
-        if(item.id === 'waterbottle') state.backpack.water = (state.backpack.water||0)+1;
-        if(item.id === 'soda_pack') state.backpack.cola = (state.backpack.cola||0)+2;
+
+        if (type === 'consumable') {
+            if(item.id === 'burger') state.backpack.food = (state.backpack.food||0)+1;
+            if(item.id === 'waterbottle') state.backpack.water = (state.backpack.water||0)+1;
+            if(item.id === 'soda_pack') state.backpack.cola = (state.backpack.cola||0)+2;
+        } else {
+            const itemId = type === 'variant' ? item.fileName : item.id;
+            const owned = getOwnedItems();
+            if (owned.includes(itemId)) return showNotification("You already own this item.");
+            
+            if (type === 'variant') state.variant = item.fileName;
+            if (item.id === 'clicker1') state.upgrades.clickPower = (state.upgrades.clickPower||1)+1;
+            if (item.id === 'auto1') state.upgrades.autoClicks = (state.upgrades.autoClicks||0)+1;
+            if (item.id === 'auto_feeder2') state.upgrades.autoClicks = (state.upgrades.autoClicks||0)+5;
+            
+            owned.push(itemId);
+            localStorage.setItem('gubby_single_owned', JSON.stringify(owned));
+        }
+        
         scheduleWrite();
-        showNotification(`Purchased ${item.title}`);
+        showNotification(`Purchased (singleplayer): ${item.title || item.id}`);
+        renderUpgradesShop();
+        renderVariantsShop();
+        renderToysShop();
+        renderStore();
         return;
     }
-    
-    const itemId = type === 'variant' ? item.fileName : item.id;
 
-    if(!currentRoom){
-      const owned = getOwnedItems();
-      if (owned.includes(itemId)) return showNotification("You already own this item.");
-      state.totalClicks -= price;
-      
-      if (type === 'variant') state.variant = item.fileName;
-      if (item.id === 'clicker1') state.upgrades.clickPower = (state.upgrades.clickPower||1)+1;
-      
-      owned.push(itemId);
-      localStorage.setItem('gubby_single_owned', JSON.stringify(owned));
-      scheduleWrite();
-      showNotification(`Purchased (singleplayer): ${item.title || item.id}`);
-      renderUpgradesShop();
-      renderVariantsShop();
-      renderToysShop();
-      return;
-    }
-
+    // MULTIPLAYER LOGIC (TRANSACTIONAL)
     if(!user) return showNotification('Sign in to buy in multiplayer.');
     const roomRef = db.collection('rooms').doc(currentRoom);
-    try{
-      await db.runTransaction(async tx => {
-        const snap = await tx.get(roomRef);
-        if(!snap.exists) throw new Error('Room missing');
-        const data = snap.data();
-        const owned = data.shopOwned || [];
-        if(owned.includes(itemId)) throw new Error('Already owned by someone in the room');
-        const roomState = data.state || {};
-        const totalClicks = Number(roomState.totalClicks || 0);
-        if(totalClicks < price) throw new Error('Not enough room clicks');
-        
-        const newOwned = owned.concat([itemId]);
-        const newState = Object.assign({}, roomState);
-        newState.totalClicks = totalClicks - price;
+    try {
+        await db.runTransaction(async tx => {
+            const snap = await tx.get(roomRef);
+            if (!snap.exists) throw new Error('Room missing');
+            const data = snap.data();
+            const owned = data.shopOwned || [];
+            const roomState = data.state || {};
+            const totalClicks = Number(roomState.totalClicks || 0);
 
-        if (type === 'variant') newState.variant = item.fileName;
-        if (item.id === 'clicker1') newState.upgrades = Object.assign({}, newState.upgrades || {}, { clickPower: (newState.upgrades?.clickPower||1)+1 });
+            if (totalClicks < price) throw new Error('Not enough room clicks');
 
-        tx.update(roomRef, { shopOwned: newOwned, state: newState, lastUpdated: Date.now() });
-      });
-      showNotification('Purchased ' + (item.title || item.id));
-    }catch(e){
-      console.warn('purchase failed', e);
-      showNotification('Purchase failed: ' + (e.message || e));
+            const newState = JSON.parse(JSON.stringify(roomState)); // Deep copy
+            newState.totalClicks = totalClicks - price;
+            let newOwned = [...owned];
+
+            if (type === 'consumable') {
+                if (item.id === 'burger') newState.backpack.food = (newState.backpack.food || 0) + 1;
+                if (item.id === 'waterbottle') newState.backpack.water = (newState.backpack.water || 0) + 1;
+                if (item.id === 'soda_pack') newState.backpack.cola = (newState.backpack.cola || 0) + 2;
+            } else {
+                const itemId = type === 'variant' ? item.fileName : item.id;
+                if (owned.includes(itemId)) throw new Error('Already owned by someone in the room');
+                
+                newOwned.push(itemId);
+
+                if (type === 'variant') {
+                    newState.variant = item.fileName;
+                    // Apply variant attributes directly
+                    const variantData = variantsData.find(v => v.fileName === item.fileName);
+                    if (variantData) {
+                        if (variantData.clickMultiplier) newState.upgrades.clickPower = (newState.upgrades.clickPower || 1) * variantData.clickMultiplier;
+                        if (variantData.autoClickRate) newState.upgrades.autoClicks = (newState.upgrades.autoClicks || 0) + variantData.autoClickRate;
+                    }
+                } else if (type === 'upgrade') {
+                    switch(item.id) {
+                        case 'clicker1': newState.upgrades.clickPower = (newState.upgrades.clickPower || 1) + 1; break;
+                        case 'auto1': newState.upgrades.autoClicks = (newState.upgrades.autoClicks || 0) + 1; break;
+                        case 'auto_feeder2': newState.upgrades.autoClicks = (newState.upgrades.autoClicks || 0) + 5; break;
+                    }
+                }
+            }
+            tx.update(roomRef, { shopOwned: newOwned, state: newState, lastUpdated: Date.now() });
+        });
+        showNotification('Purchased ' + (item.title || item.id));
+    } catch (e) {
+        console.warn('Purchase failed', e);
+        showNotification('Purchase failed: ' + (e.message || e));
     }
   }
   
@@ -991,50 +1002,117 @@
     });
   }
 
-  // ================= GAME LOGIC & LOOP =================
-  function getActiveVariantMultiplier() {
-      if (!state.variant || state.variant === 'default.png') return 1;
-      const currentVariant = variantsData.find(v => v.fileName === state.variant);
-      return currentVariant?.clickMultiplier || 1;
-  }
-  
+  // ================= GAME LOGIC & LOOP (MULTIPLAYER SYNCED) =================
   function playClickSound() {
       try {
           new Audio('sounds/merp.mp3').play().catch(()=>{});
       } catch(e) { console.warn("Could not play sound", e); }
   }
 
-  el('gubbySprite').addEventListener('click', ()=> {
+  el('gubbySprite').addEventListener('click', async ()=> {
     if(!state.alive) return;
     
     const gubby = el('gubbySprite');
     gubby.classList.add('clicked');
     setTimeout(() => gubby.classList.remove('clicked'), 100);
-
     playClickSound();
-    const variantMultiplier = getActiveVariantMultiplier();
-    const power = (state.upgrades.clickPower || 1) * variantMultiplier;
-    state.clicks += power;
-    state.totalClicks += power;
-    state.hunger = Math.max(0, state.hunger - 0.1);
-    state.thirst = Math.max(0, state.thirst - 0.2);
-    scheduleWrite();
+
+    const power = state.upgrades.clickPower || 1;
+
+    // SINGLEPLAYER CLICK
+    if (!currentRoom) {
+        state.clicks += power;
+        state.totalClicks += power;
+        state.hunger = Math.max(0, state.hunger - 0.1);
+        state.thirst = Math.max(0, state.thirst - 0.2);
+        scheduleWrite();
+        return;
+    }
+
+    // MULTIPLAYER CLICK (TRANSACTIONAL)
+    const roomRef = db.collection('rooms').doc(currentRoom);
+    try {
+        await roomRef.update({
+            'state.totalClicks': firebase.firestore.FieldValue.increment(power),
+            'state.hunger': firebase.firestore.FieldValue.increment(-0.1),
+            'state.thirst': firebase.firestore.FieldValue.increment(-0.2)
+        });
+    } catch (e) {
+        console.warn("Click update failed", e);
+    }
   });
 
-  el('feedBtn').addEventListener('click', ()=> { if(state.backpack.food>0){ state.backpack.food--; state.hunger = Math.min(100, state.hunger+25); scheduleWrite(); } else showNotification('You have no food!');});
-  el('waterBtn').addEventListener('click', ()=> { if(state.backpack.water>0){ state.backpack.water--; state.thirst = Math.min(100, state.thirst+25); scheduleWrite(); } else showNotification('You have no water!');});
-  el('colaBtn').addEventListener('click', ()=> { if(state.backpack.cola>0){ state.backpack.cola--; state.energy = Math.min(100, state.energy+50); scheduleWrite(); } else showNotification('You have no Bloxy Cola!');});
-  
+  async function performRoomAction(action) {
+      if (!currentRoom || !user) {
+          // Fallback to single player logic if not in a room
+          action(state);
+          scheduleWrite();
+          return;
+      }
+      
+      const roomRef = db.collection('rooms').doc(currentRoom);
+      try {
+          await db.runTransaction(async tx => {
+              const snap = await tx.get(roomRef);
+              if (!snap.exists) throw new Error("Room not found");
+              const remoteState = snap.data().state;
+              
+              // Perform the action on a copy of the remote state
+              action(remoteState);
+
+              // Update the state in the transaction
+              tx.update(roomRef, { state: remoteState });
+          });
+      } catch (e) {
+          console.error("Room action failed: ", e);
+          showNotification("Action failed: " + e.message, "Error");
+      }
+  }
+
+  el('feedBtn').addEventListener('click', () => {
+      performRoomAction(s => {
+          if (s.backpack.food > 0) {
+              s.backpack.food--;
+              s.hunger = Math.min(100, s.hunger + 25);
+          } else {
+              if(!currentRoom) showNotification('You have no food!');
+              // In multiplayer, we might not show this to avoid spamming.
+              // The button could be disabled via UI based on state.
+          }
+      });
+  });
+
+  el('waterBtn').addEventListener('click', () => {
+      performRoomAction(s => {
+          if (s.backpack.water > 0) {
+              s.backpack.water--;
+              s.thirst = Math.min(100, s.thirst + 25);
+          }
+      });
+  });
+
+  el('colaBtn').addEventListener('click', () => {
+      performRoomAction(s => {
+          if (s.backpack.cola > 0) {
+              s.backpack.cola--;
+              s.energy = Math.min(100, s.energy + 50);
+          }
+      });
+  });
+
   el('playBtn').addEventListener('click', ()=> {
       if (playCooldown) return showNotification("You need to wait before playing again.");
-      state.happiness = Math.min(100, state.happiness + 15);
+      
+      performRoomAction(s => {
+          s.happiness = Math.min(100, s.happiness + 15);
+      });
+
       playCooldown = true;
       el('playBtn').disabled = true;
       setTimeout(() => {
           playCooldown = false;
           el('playBtn').disabled = false;
-      }, 60000); // 1 minute cooldown
-      scheduleWrite();
+      }, 60000); // 1 minute cooldown for the local player
   });
 
   function wander(){
@@ -1042,47 +1120,68 @@
     const margin = 80;
     const newX = Math.random()*(el('house').clientWidth - margin*2) + margin;
     const newY = Math.random()*(el('house').clientHeight - margin*2) + margin;
+    
+    // Wander is a local visual effect, but we'll let the host dictate energy loss
     state.pos.x = newX; state.pos.y = newY;
-    state.energy = Math.max(0, state.energy - 0.2);
     el('gubbySprite').style.left = newX + 'px'; el('gubbySprite').style.top = newY + 'px';
-    scheduleWrite();
+    
+    if (!currentRoom) {
+        state.energy = Math.max(0, state.energy - 0.2);
+        scheduleWrite();
+    }
   }
   setInterval(wander, 4000);
 
+  // HOST-AUTHORITATIVE GAME LOOP
   setInterval(()=>{
-    if(!state.alive) return;
-    const currentVariant = variantsData.find(v => v.fileName === state.variant);
-    const owned = getOwnedItems();
-    let happinessBoost = 0;
-    toysData.forEach(toy => {
-        if (owned.includes(toy.id)) {
-            happinessBoost += toy.happinessBoost;
+    // This loop only performs writes if the current client is the host of the room.
+    // All other clients are passive and just receive updates from the `onSnapshot` listener.
+    const isHost = currentRoom && user && window.__roomCache && user.uid === window.__roomCache.hostUid;
+    
+    if (!isHost) {
+        // If not in a room, run the single-player loop
+        if (!currentRoom) {
+            if(!state.alive) return;
+            const owned = getOwnedItems();
+            let happinessBoost = 0;
+            toysData.forEach(toy => { if (owned.includes(toy.id)) happinessBoost += toy.happinessBoost; });
+            state.happiness = Math.min(100, state.happiness + happinessBoost);
+            state.hunger = Math.max(0, state.hunger - 0.5);
+            state.thirst = Math.max(0, state.thirst - 0.6);
+            state.happiness = Math.max(0, state.happiness - 0.2);
+            state.totalClicks += state.upgrades.autoClicks;
+            if(state.hunger <= 0 || state.thirst <= 0 || state.happiness <= 0){
+                state.alive = false; showGameOver();
+            }
+            scheduleWrite();
+        }
+        return; 
+    }
+
+    // HOST-ONLY LOGIC
+    const roomRef = db.collection('rooms').doc(currentRoom);
+    performRoomAction(s => {
+        if(!s.alive) return;
+        const owned = window.__roomCache.shopOwned || [];
+        let happinessBoost = 0;
+        toysData.forEach(toy => { if (owned.includes(toy.id)) happinessBoost += toy.happinessBoost; });
+
+        s.happiness = Math.min(100, s.happiness + happinessBoost);
+        s.hunger = Math.max(0, s.hunger - 0.5);
+        s.thirst = Math.max(0, s.thirst - 0.6);
+        s.happiness = Math.max(0, s.happiness - 0.2);
+        
+        const hour = (new Date()).getHours();
+        if(hour>=22||hour<7) s.energy = Math.min(100, s.energy + 1); else s.energy = Math.max(0, s.energy - 0.2);
+        if(s.hunger === 0 || s.thirst === 0) s.energy = Math.max(0, s.energy - 1);
+        
+        s.totalClicks += s.upgrades.autoClicks;
+
+        if(s.energy <= 0 || s.hunger <= 0 || s.thirst <= 0 || s.happiness <= 0){
+            s.alive = false;
         }
     });
 
-    state.happiness = Math.min(100, state.happiness + happinessBoost);
-    
-    const hungerDecay = currentVariant?.hungerDecayMod || 0.5;
-    const thirstDecay = currentVariant?.thirstDecayMod || 0.6;
-    const energyGain = currentVariant?.energyGainMod || 1;
-    const happinessDecay = currentVariant?.happinessDecayMod || 0.2;
-    
-    state.hunger = Math.max(0, state.hunger - hungerDecay);
-    state.thirst = Math.max(0, state.thirst - thirstDecay);
-    state.happiness = Math.max(0, state.happiness - happinessDecay);
-    
-    const hour = (new Date()).getHours();
-    if(hour>=22||hour<7) state.energy = Math.min(100, state.energy + energyGain); else state.energy = Math.max(0, state.energy - 0.2);
-    if(state.hunger === 0 || state.thirst === 0) state.energy = Math.max(0, state.energy - 1);
-    
-    const autoClickRate = currentVariant?.autoClickRate || 0;
-    state.clicks += state.upgrades.autoClicks + autoClickRate;
-    state.totalClicks += state.upgrades.autoClicks + autoClickRate;
-
-    if(state.energy <= 0 || state.hunger <= 0 || state.thirst <= 0 || state.happiness <= 0){
-      state.alive = false; scheduleWrite(); showGameOver();
-    }
-    scheduleWrite();
   }, 5000);
 
   // ================= GAME OVER UI =================
