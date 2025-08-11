@@ -22,7 +22,8 @@
     .title{font-size:18px;margin:0}
     .subtitle{font-size:13px;color:var(--muted)}
     .top-actions{display:flex;gap:8px;align-items:center}
-    .btn{padding:10px 12px;border-radius:10px;border:0;background:var(--accent);color:white;font-weight:700;cursor:pointer}
+    .btn{padding:10px 12px;border-radius:10px;border:0;background:var(--accent);color:white;font-weight:700;cursor:pointer;transition: all .2s;}
+    .btn:hover{filter:brightness(1.1);}
     .btn.secondary{background:white;color:var(--accent);border:1px solid rgba(75,110,255,0.12)}
     .btn.ghost{background:transparent;border:1px solid rgba(12,40,80,0.06);color:var(--muted)}
     .grid{display:grid;grid-template-columns:1fr 360px;gap:14px}
@@ -40,19 +41,17 @@
     body.room-mode .fill{background:linear-gradient(90deg,var(--room-accent),var(--room-accent2))}
     .controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
     .right-col{display:flex;flex-direction:column;gap:12px}
-    .variants-list{display:flex;flex-direction:column;gap:8px}
     .member-list{display:flex;flex-direction:column;gap:8px}
     .modal-backdrop{position:fixed;inset:0;background:rgba(8,10,20,0.45);display:none;align-items:center;justify-content:center;z-index:999}
-    .modal{width:92%;max-width:900px;background:white;border-radius:10px;padding:16px;box-shadow:0 30px 80px rgba(12,40,80,0.2);transform:translateY(8px);opacity:0;transition:all .18s}
+    .modal{width:92%;max-width:500px;background:white;border-radius:10px;padding:16px;box-shadow:0 30px 80px rgba(12,40,80,0.2);transform:translateY(8px);opacity:0;transition:all .18s}
     .modal.show{transform:none;opacity:1}
-    .shop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-    @media (max-width:900px){ .shop-grid{grid-template-columns:repeat(2,1fr)} }
-    @media (max-width:600px){ .shop-grid{grid-template-columns:1fr} }
+    .shop-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px}
     .shop-card{border-radius:10px;padding:10px;background:linear-gradient(180deg,#fff,#f6fbff);border:1px solid rgba(12,40,80,0.04);display:flex;flex-direction:column;gap:8px;min-height:110px}
     .chat-window{height:360px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;border:1px solid rgba(12,40,80,0.06)}
     .chat-messages{flex:1;padding:10px;overflow:auto;background:#fbfdff}
     .chat-input{display:flex;gap:8px;padding:8px;border-top:1px solid rgba(12,40,80,0.04);background:white}
     .small{font-size:13px;color:var(--muted)}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
   </style>
 </head>
 <body>
@@ -91,8 +90,6 @@
           <button id="playBtn" class="btn secondary">Play</button>
           <button id="hostBtn" class="btn">Host</button>
           <button id="joinBtn" class="btn secondary">Join</button>
-          <button id="resetBtn" class="btn ghost">Request Reset</button>
-          <button id="chatOpenBtn" class="btn secondary" style="display:none">💬 Chat</button>
         </div>
 
         <div class="small" style="text-align:center;margin-top:8px">Click Gubby to get clicks. Singleplayer and multiplayer saves are separate.</div>
@@ -100,27 +97,17 @@
 
       <div class="right-col">
         <div class="card">
-          <strong>Connection</strong>
-          <div class="small" style="margin-top:8px">Rooms: sign in, host or join with a 4-letter code.</div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
-            <div><div class="small">Status</div><div id="connectionStatus" style="font-weight:800">Not connected</div></div>
-            <div style="text-align:right">
-              <div id="roomCode" style="font-weight:900"></div>
-              <div style="margin-top:6px"><button id="copyRoom" class="btn small ghost" style="display:none">Copy</button> <button id="leaveRoom" class="btn small ghost" style="display:none">Leave</button></div>
-            </div>
-          </div>
-
-          <div style="margin-top:12px">
-            <div class="small">Members</div>
-            <div id="members" class="member-list"></div>
-          </div>
-
-          <div style="margin-top:8px"><div id="resetStatus" class="small"></div></div>
-        </div>
-
-        <div class="card">
           <strong>Account</strong>
           <div id="accountInfo" class="small" style="margin-top:8px">—</div>
+        </div>
+        
+        <div class="card">
+            <strong>Singleplayer</strong>
+            <div class="small" style="margin-top:8px">Manage your local game save.</div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button id="downloadSaveBtn" class="btn secondary">Download Save</button>
+                <button id="singleplayerResetBtn" class="btn ghost">Reset Save</button>
+            </div>
         </div>
 
         <div class="card" id="adminPanel" style="display:none">
@@ -133,8 +120,39 @@
     <footer class="small" style="text-align:center">Gubby Clicker — Firestore rooms · 50+ shop items</footer>
   </div>
 
+  <!-- Multiplayer Modal -->
+  <div class="modal-backdrop" id="multiplayerModal"><div class="modal" id="multiplayerBox">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0">Multiplayer Room</h3>
+        <button id="leaveRoom" class="btn ghost">Leave</button>
+      </div>
+      <div style="margin-top:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div><div class="small">Status</div><div id="connectionStatus" style="font-weight:800">Not connected</div></div>
+            <div style="text-align:right">
+              <div id="roomCode" style="font-weight:900; font-size: 20px;"></div>
+              <div style="margin-top:6px"><button id="copyRoom" class="btn small ghost">Copy Code</button></div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <div class="small">Members</div>
+            <div id="members" class="member-list" style="margin-top: 8px;"></div>
+          </div>
+          
+          <div style="margin-top:12px; border-top: 1px solid #eee; padding-top: 12px;">
+              <div class="small">Room Actions</div>
+              <div style="display:flex; gap: 8px; margin-top: 8px;">
+                <button id="chatOpenBtn" class="btn secondary">💬 Chat</button>
+                <button id="resetBtn" class="btn ghost">Request Reset</button>
+              </div>
+              <div style="margin-top:8px"><div id="resetStatus" class="small"></div></div>
+          </div>
+      </div>
+  </div></div>
+
   <!-- Shop Modal -->
-  <div class="modal-backdrop" id="shopModal"><div class="modal" id="shopBox">
+  <div class="modal-backdrop" id="shopModal"><div class="modal" id="shopBox" style="max-width: 900px;">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <h3 style="margin:0">Shop</h3>
       <div style="display:flex;gap:8px;align-items:center">
@@ -171,11 +189,21 @@
   <div class="modal-backdrop" id="joinModal"><div class="modal" id="joinBox">
     <h3>Join Room</h3>
     <input id="joinCode" placeholder="4-letter code" style="padding:8px;width:180px;border-radius:6px;border:1px solid #ddd"/>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+    <div class="modal-actions">
       <button id="joinConfirm" class="btn">Join</button>
       <button id="joinCancel" class="btn secondary">Cancel</button>
     </div>
   </div></div>
+  
+  <!-- Generic Notification/Confirmation Modal -->
+  <div class="modal-backdrop" id="notificationModal"><div class="modal" id="notificationBox">
+      <h3 id="notificationTitle" style="margin:0 0 10px 0;">Notification</h3>
+      <p id="notificationMessage" style="margin:0;"></p>
+      <div id="notificationActions" class="modal-actions">
+          <!-- Buttons are added dynamically -->
+      </div>
+  </div></div>
+
 
   <!-- Firebase compat scripts (avoid import/export issues) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -261,8 +289,6 @@
     {id:'snack_vending', title:'Snack Vending Machine', price:9800, tier:'Luxury', desc:'Auto snacks'},
     {id:'galactic_bowl', title:'Galactic Bowl', price:21000, tier:'Endgame', desc:'Mystic bowl'}
   ];
-
-  // list of tiers to show
   const tiers = Array.from(new Set(shopData.map(s=>s.tier)));
 
   // ================= UTIL =================
@@ -271,6 +297,34 @@
   function saveLocalState(){ localStorage.setItem('gubby_single_local', JSON.stringify(state)); }
   function loadLocalState(){ try{ const raw = localStorage.getItem('gubby_single_local'); if(raw) return JSON.parse(raw);}catch(e){} return JSON.parse(JSON.stringify(defaultState)); }
   function clamp(v){ return Math.max(0, Math.min(100, Math.round(v))); }
+  
+  function showNotification(message, title = 'Notification', buttons = [{ text: 'OK', class: 'btn' }]) {
+    el('notificationTitle').textContent = title;
+    el('notificationMessage').innerHTML = message;
+    const actions = el('notificationActions');
+    actions.innerHTML = '';
+    
+    const modal = el('notificationModal');
+    
+    buttons.forEach(btnInfo => {
+        const button = document.createElement('button');
+        button.textContent = btnInfo.text;
+        button.className = btnInfo.class;
+        button.onclick = () => {
+            closeNotification();
+            if (btnInfo.onClick) btnInfo.onClick();
+        };
+        actions.appendChild(button);
+    });
+
+    modal.style.display = 'flex';
+    setTimeout(() => el('notificationBox').classList.add('show'), 10);
+  }
+
+  function closeNotification() {
+      el('notificationBox').classList.remove('show');
+      setTimeout(() => el('notificationModal').style.display = 'none', 180);
+  }
 
   function applyUI(){
     el('hungerVal').textContent = Math.round(state.hunger);
@@ -297,17 +351,15 @@
           user = u;
           if(user){
             el('signInBtn').style.display = 'none';
-            // load singleplayer server copy if exists
             await loadSingleplayerFromServer().catch(()=>{});
           } else {
             el('signInBtn').style.display = 'inline-block';
-            // restore local singleplayer
             state = loadLocalState();
             applyUI();
           }
+          applyUI();
         });
 
-        // variants listener (optional)
         db.collection('variants').onSnapshot(snap => {
           renderVariants(snap.docs.map(d => ({ id:d.id, ...d.data() })));
         }, ()=>{});
@@ -315,6 +367,7 @@
       }
     }catch(e){
       console.error('init firebase failed', e);
+      showNotification('Could not connect to game services.', 'Connection Error');
     }
   }
   initFirebase();
@@ -325,7 +378,7 @@
       if(!db) initFirebase();
       const provider = new firebase.auth.GoogleAuthProvider();
       await firebase.auth().signInWithPopup(provider);
-    }catch(e){ alert('Sign-in failed: ' + (e.message||e)); }
+    }catch(e){ showNotification('Sign-in failed: ' + (e.message||e)); }
   });
 
   // ================= SINGLEPLAYER SERVER SYNC =================
@@ -336,15 +389,13 @@
       const snap = await ref.get();
       if(snap.exists){
         const remote = snap.data();
-        // merge remote singleplayer to local
         state = Object.assign({}, state, remote);
         saveLocalState();
-        applyUI();
       } else {
-        // create server doc from local
         await ref.set(state);
       }
     }catch(e){ console.warn('load singleplayer failed', e); }
+    applyUI();
   }
   async function saveSingleplayerToServer(){
     if(!auth || !auth.currentUser) return;
@@ -362,8 +413,8 @@
   }
 
   async function hostRoom(){
-    if(!auth || !auth.currentUser) { alert('Sign in to host'); return; }
-    if(currentRoom) return alert('Leave current room first');
+    if(!auth || !auth.currentUser) { showNotification('Please sign in to host a room.'); return; }
+    if(currentRoom) return showNotification('You are already in a room. Please leave the current room first.');
     for(let attempt=0; attempt<6; attempt++){
       const code = genCode();
       try{
@@ -376,60 +427,69 @@
           listenRoom(code);
           listenMembers(code);
           applyRoomUI(true, code);
-          alert('Hosted room ' + code);
+          showNotification(`You are now hosting room <strong>${code}</strong>.`, 'Room Hosted!');
           return;
         }
       }catch(e){ console.warn('host attempt failed', e); }
     }
-    alert('Could not create a room — try again.');
+    showNotification('Could not create a room at this time. Please try again.', 'Error');
   }
 
   async function joinRoom(code){
-    if(!auth || !auth.currentUser) { alert('Sign in to join'); return; }
-    if(currentRoom) return alert('Already in a room');
+    if(!auth || !auth.currentUser) { showNotification('Please sign in to join a room.'); return; }
+    if(currentRoom) return showNotification('You are already in a room.');
     code = (code||'').trim().toUpperCase();
-    if(!code) return alert('Enter code');
+    if(!code) return showNotification('Please enter a room code.');
     try{
       const ref = db.collection('rooms').doc(code);
       const snap = await ref.get();
-      if(!snap.exists) return alert('Room not found');
+      if(!snap.exists) return showNotification('That room could not be found.', 'Error');
       currentRoom = code;
       await ref.collection('members').doc(auth.currentUser.uid).set({ uid: auth.currentUser.uid, name: auth.currentUser.displayName||auth.currentUser.email, joinedAt: Date.now() });
       listenRoom(code);
       listenMembers(code);
       applyRoomUI(true, code);
-      alert('Joined ' + code);
-    }catch(e){ alert('Join failed: ' + (e.message||e)); }
+      showNotification(`Successfully joined room <strong>${code}</strong>.`, 'Room Joined!');
+    }catch(e){ showNotification('Join failed: ' + (e.message||e)); }
   }
 
   async function leaveRoom(){
     if(!currentRoom) return;
-    try{
-      const ref = db.collection('rooms').doc(currentRoom);
-      if(auth && auth.currentUser) await ref.collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
-      // if host and no members remain, delete room
-      if(auth && auth.currentUser){
-        const members = await ref.collection('members').limit(1).get();
-        if(members.empty) await ref.delete().catch(()=>{});
-      }
-    }catch(e){ console.warn('leave failed', e); }
+    const roomToLeave = currentRoom;
+    
+    // Clear listeners and local state immediately
     if(roomUnsub){ roomUnsub(); roomUnsub=null; }
     if(membersUnsub){ membersUnsub(); membersUnsub=null; }
     if(messagesUnsub){ messagesUnsub(); messagesUnsub=null; }
     currentRoom = null;
     applyRoomUI(false, '');
-    // restore singleplayer state
+
+    // Restore singleplayer state
     if(user) await loadSingleplayerFromServer().catch(()=>{}); else { state = loadLocalState(); applyUI(); }
+
+    try{
+      const ref = db.collection('rooms').doc(roomToLeave);
+      if(auth && auth.currentUser) await ref.collection('members').doc(auth.currentUser.uid).delete().catch(()=>{});
+      
+      const membersSnap = await ref.collection('members').get();
+      if(membersSnap.empty) {
+          // If room is empty, delete it after a short delay
+          setTimeout(() => ref.delete().catch(e => console.warn("Failed to delete empty room", e)), 2000);
+      }
+    }catch(e){ console.warn('leave room db cleanup failed', e); }
   }
 
   function listenRoom(code){
     if(roomUnsub) roomUnsub();
     const ref = db.collection('rooms').doc(code);
     roomUnsub = ref.onSnapshot(doc => {
-      if(!doc.exists){ alert('Room closed'); leaveRoom(); return; }
+      if(!doc.exists){ 
+          showNotification('The room was closed.', 'Room Closed');
+          leaveRoom(); 
+          return; 
+      }
       const data = doc.data();
       if(!data) return;
-      // merge remote state
       if(data.state) mergeRemoteState(data.state);
       window.__roomCache = data;
       updateResetStatus(data.resetVotes || []);
@@ -451,7 +511,6 @@
     saveLocalState();
     applyUI();
     if(!currentRoom){
-      // singleplayer: persist to server if signed in
       if(user) saveSingleplayerToServer().catch(()=>{});
       return;
     }
@@ -481,8 +540,40 @@
     state.energy = Math.round((state.energy + (remote.energy||state.energy))/2);
     saveLocalState(); applyUI();
   }
+  
+    // ================= SINGLEPLAYER ACTIONS =================
+    el('singleplayerResetBtn').addEventListener('click', () => {
+        showNotification('Are you sure you want to reset your single-player save? This cannot be undone.', 'Confirm Reset', [
+            { text: 'Reset', class: 'btn', onClick: () => {
+                state = JSON.parse(JSON.stringify(defaultState));
+                saveLocalState();
+                if (user) saveSingleplayerToServer();
+                applyUI();
+                showNotification('Your single-player game has been reset.', 'Success');
+            }},
+            { text: 'Cancel', class: 'btn secondary' }
+        ]);
+    });
 
-  // ================= SHOP UI & BUY (multi & singleplayer) =================
+    el('downloadSaveBtn').addEventListener('click', () => {
+        try {
+            const saveData = JSON.stringify(state, null, 2);
+            const blob = new Blob([saveData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'gubby-save.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('Failed to download save file', e);
+            showNotification('Could not download save file.', 'Error');
+        }
+    });
+
+  // ================= SHOP UI & BUY =================
   let currentTier = tiers[0] || 'Basic';
   el('shopOpenBtn').addEventListener('click', ()=> { openShop(); });
 
@@ -495,11 +586,9 @@
 
   function renderShopGrid(tier){
     const grid = el('shopGrid'); grid.innerHTML = '';
-    // determine owned items (room or singleplayer)
     let owned = [];
     if(currentRoom && window.__roomCache) owned = window.__roomCache.shopOwned || [];
     else {
-      // read singleplayer owned from localStorage or server
       const raw = localStorage.getItem('gubby_single_owned'); if(raw){ try{ owned = JSON.parse(raw); }catch(e){} }
     }
     shopData.filter(s=>s.tier===tier).forEach(item => {
@@ -515,24 +604,21 @@
 
   async function buyItem(item){
     if(!currentRoom){
-      // SINGLEPLAYER buy
-      if(state.totalClicks < item.price) return alert('Not enough clicks in your singleplayer save.');
+      if(state.totalClicks < item.price) return showNotification('Not enough clicks in your singleplayer save.');
       state.totalClicks -= item.price;
       if(item.id === 'burger') state.backpack.food = (state.backpack.food||0)+1;
       if(item.id === 'waterbottle') state.backpack.water = (state.backpack.water||0)+1;
       if(item.id === 'clicker1') state.upgrades.clickPower = (state.upgrades.clickPower||1)+1;
       saveLocalState(); applyUI();
-      // record owned locally
       try{
         const raw = localStorage.getItem('gubby_single_owned'); const arr = raw?JSON.parse(raw):[]; if(!arr.includes(item.id)) arr.push(item.id); localStorage.setItem('gubby_single_owned', JSON.stringify(arr));
-        alert('Purchased (singleplayer): ' + item.title);
-      }catch(e){ console.warn('record single owned failed', e); alert('Purchased locally'); }
+        showNotification('Purchased (singleplayer): ' + item.title);
+      }catch(e){ console.warn('record single owned failed', e); showNotification('Purchased locally'); }
       renderShopGrid(currentTier);
       return;
     }
 
-    // MULTIPLAYER buy with transaction
-    if(!user) return alert('Sign in to buy in multiplayer.');
+    if(!user) return showNotification('Sign in to buy in multiplayer.');
     const roomRef = db.collection('rooms').doc(currentRoom);
     try{
       await db.runTransaction(async tx => {
@@ -553,33 +639,36 @@
         if(item.id === 'autoclick1') newState.upgrades = Object.assign({}, newState.upgrades || {}, { autoClicks: (newState.upgrades?.autoClicks||0)+1 });
         tx.update(roomRef, { shopOwned: newOwned, state: newState, lastUpdated: Date.now() });
       });
-      alert('Purchased ' + item.title);
-      // local reflect will come from room snapshot listener
+      showNotification('Purchased ' + item.title);
     }catch(e){
       console.warn('purchase failed', e);
-      alert('Purchase failed: ' + (e.message || e));
+      showNotification('Purchase failed: ' + (e.message || e));
     }
   }
 
-  // ================= CHAT (messages subcollection) =================
+  // ================= CHAT =================
   el('chatOpenBtn').addEventListener('click', openChat);
   el('chatSend').addEventListener('click', sendChatMessage);
   el('closeChat').addEventListener('click', closeChat);
   el('chatClear').addEventListener('click', async ()=>{
-    if(!currentRoom) return alert('Join a room');
-    if(!confirm('Clear chat for everyone?')) return;
-    try{
-      const msgsRef = db.collection('rooms').doc(currentRoom).collection('messages');
-      const snap = await msgsRef.get();
-      const batch = db.batch();
-      snap.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-      alert('Chat cleared');
-    }catch(e){ console.warn('clear chat failed', e); alert('Clear failed: ' + (e.message||e)); }
+    if(!currentRoom) return showNotification('Join a room first.');
+    showNotification('Are you sure you want to clear the chat for everyone?', 'Confirm Clear', [
+        { text: 'Clear Chat', class: 'btn', onClick: async () => {
+            try{
+              const msgsRef = db.collection('rooms').doc(currentRoom).collection('messages');
+              const snap = await msgsRef.get();
+              const batch = db.batch();
+              snap.forEach(d => batch.delete(d.ref));
+              await batch.commit();
+              showNotification('Chat cleared');
+            }catch(e){ console.warn('clear chat failed', e); showNotification('Clear failed: ' + (e.message||e)); }
+        }},
+        { text: 'Cancel', class: 'btn secondary' }
+    ]);
   });
 
   function openChat(){
-    if(!currentRoom) return alert('Join a room to chat');
+    if(!currentRoom) return showNotification('Join a room to chat');
     el('chatModal').style.display = 'flex'; setTimeout(()=> el('chatBox').classList.add('show'), 10);
     el('chatRoomLabel').textContent = currentRoom ? 'Room ' + currentRoom : '';
     listenMessages(currentRoom);
@@ -604,13 +693,13 @@
       container.scrollTop = container.scrollHeight;
     }, err => {
       console.warn('messages listen err', err);
-      alert('Chat listen error: ' + (err.message||err));
+      showNotification('Chat listen error: ' + (err.message||err));
     });
   }
 
   async function sendChatMessage(){
-    if(!currentRoom) return alert('Join a room first');
-    if(!user) return alert('Sign in to chat');
+    if(!currentRoom) return showNotification('Join a room first');
+    if(!user) return showNotification('Sign in to chat');
     const text = (el('chatInput').value || '').trim();
     if(!text) return;
     try{
@@ -618,16 +707,18 @@
       el('chatInput').value = '';
     }catch(e){
       console.warn('send chat failed', e);
-      alert('Send chat failed: ' + (e.message||e) + '\nCheck Firestore rules.');
+      showNotification('Send chat failed: ' + (e.message||e) + '\nCheck Firestore rules.');
     }
   }
 
-  // ================= RESET (unanimous) =================
+  // ================= RESET =================
   el('resetBtn').addEventListener('click', ()=> {
-    if(!currentRoom) return alert('Join a room first');
-    if(!auth || !auth.currentUser) return alert('Sign in to request reset');
-    if(!confirm('Request a room reset? All members must agree.')) return;
-    requestResetVote();
+    if(!currentRoom) return showNotification('Join a room first');
+    if(!auth || !auth.currentUser) return showNotification('Sign in to request reset');
+    showNotification('Request a room reset? All members must agree.', 'Confirm Reset', [
+        { text: 'Request Reset', class: 'btn', onClick: requestResetVote },
+        { text: 'Cancel', class: 'btn secondary' }
+    ]);
   });
 
   async function requestResetVote(){
@@ -649,27 +740,23 @@
           tx.update(roomRef, { resetVotes: Array.from(resetSet), lastUpdated: Date.now() });
         }
       });
-      // after tx, if reset performed, clear messages
       const doc = await roomRef.get();
       const dataAfter = doc.data();
       if(dataAfter && Array.isArray(dataAfter.resetVotes) && dataAfter.resetVotes.length === 0){
-        // delete messages
         try{
           const msgsRef = roomRef.collection('messages');
           const snap = await msgsRef.get();
           if(!snap.empty){
-            const batchArray = [];
-            let batch = db.batch(), ops = 0;
-            snap.forEach(d => { batch.delete(d.ref); ops++; if(ops===500){ batchArray.push(batch); batch = db.batch(); ops=0; } });
-            batchArray.push(batch);
-            for(const b of batchArray) await b.commit();
+            const batch = db.batch();
+            snap.forEach(d => batch.delete(d.ref));
+            await batch.commit();
           }
         }catch(e){ console.warn('post-reset message deletion failed', e); }
       }
-      alert('Your vote recorded. Reset happens when all members agree.');
+      showNotification('Your vote was recorded. The room will reset when all members agree.');
     }catch(e){
       console.warn('reset tx failed', e);
-      alert('Reset failed: ' + (e.message||e));
+      showNotification('Reset failed: ' + (e.message||e));
     }
   }
 
@@ -678,13 +765,17 @@
     try{
       const membersSnap = await db.collection('rooms').doc(currentRoom).collection('members').get();
       const count = membersSnap.size;
-      el('resetStatus').textContent = `${(votes||[]).length} / ${count} agreed`;
-    }catch(e){ el('resetStatus').textContent = `${(votes||[]).length} votes`; }
+      el('resetStatus').textContent = `Reset votes: ${(votes||[]).length} / ${count}`;
+    }catch(e){ el('resetStatus').textContent = `Reset votes: ${(votes||[]).length}`; }
   }
 
   // ================= MEMBERS UI =================
   function renderMembers(arr){
     const wrap = el('members'); wrap.innerHTML = '';
+    if (arr.length === 0) {
+        wrap.innerHTML = `<div class="small">Just you in here... for now.</div>`;
+        return;
+    }
     arr.forEach(m=>{
       const d = document.createElement('div'); d.className='small'; d.style.padding='6px'; d.style.borderRadius='6px'; d.style.border='1px solid rgba(12,40,80,0.04)'; d.textContent = m.name || m.uid;
       wrap.appendChild(d);
@@ -699,20 +790,12 @@
     state.clicks += power; state.totalClicks += power;
     state.hunger = Math.max(0, state.hunger - 0.1);
     state.thirst = Math.max(0, state.thirst - 0.2);
-    playClickSound();
     scheduleWrite();
   });
 
-  function playClickSound(){
-    try{
-      // quick audio (if merp exists)
-      new Audio('sounds/merp.mp3').play().catch(()=>{});
-    }catch(e){}
-  }
-
-  el('feedBtn').addEventListener('click', ()=> { if(state.backpack.food>0){ state.backpack.food--; state.hunger = Math.min(100, state.hunger+25); scheduleWrite(); } else alert('No food');});
-  el('waterBtn').addEventListener('click', ()=> { if(state.backpack.water>0){ state.backpack.water--; state.thirst = Math.min(100, state.thirst+25); scheduleWrite(); } else alert('No water');});
-  el('colaBtn').addEventListener('click', ()=> { if(state.backpack.cola>0){ state.backpack.cola--; state.energy = Math.min(100, state.energy+50); scheduleWrite(); } else alert('No cola');});
+  el('feedBtn').addEventListener('click', ()=> { if(state.backpack.food>0){ state.backpack.food--; state.hunger = Math.min(100, state.hunger+25); scheduleWrite(); } else showNotification('You have no food!');});
+  el('waterBtn').addEventListener('click', ()=> { if(state.backpack.water>0){ state.backpack.water--; state.thirst = Math.min(100, state.thirst+25); scheduleWrite(); } else showNotification('You have no water!');});
+  el('colaBtn').addEventListener('click', ()=> { if(state.backpack.cola>0){ state.backpack.cola--; state.energy = Math.min(100, state.energy+50); scheduleWrite(); } else showNotification('You have no Bloxy Cola!');});
   el('playBtn').addEventListener('click', ()=> { state.energy = Math.min(100, state.energy+8); scheduleWrite(); });
 
   function wander(){
@@ -742,11 +825,8 @@
   }, 10000);
 
   // ================= GAME OVER UI =================
-  function showGameOver(){ /* minimal modal alert for now */ alert('Game Over — Gubby is out of health. Restart locally or ask room to reset.'); }
-  // ================= VARIANTS (simple render) =================
-  function renderVariants(items){
-    // optional: render variant list — left for expansion
-  }
+  function showGameOver(){ showNotification('Gubby has run out of health! In single-player, you can reset your save. In multiplayer, ask the room to vote for a reset.', 'Game Over'); }
+  function renderVariants(items){ }
 
   // ================= HELPERS =================
   function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
@@ -756,35 +836,32 @@
   el('joinBtn').addEventListener('click', ()=> { el('joinModal').style.display='flex'; setTimeout(()=> el('joinBox').classList.add('show'),10); });
   el('joinCancel').addEventListener('click', ()=> { el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none',180); });
   el('joinConfirm').addEventListener('click', ()=> { const code = el('joinCode').value.trim(); el('joinBox').classList.remove('show'); setTimeout(()=> el('joinModal').style.display='none',180); if(code) joinRoom(code); });
-  el('leaveRoom').addEventListener('click', ()=> { if(confirm('Leave room?')) leaveRoom(); });
-  el('copyRoom').addEventListener('click', ()=> { if(!currentRoom) return; navigator.clipboard?.writeText(currentRoom).then(()=>alert('Copied'), ()=>alert('Copy failed')); });
-
-  el('chatOpenBtn').addEventListener('click', ()=> { if(!currentRoom) return alert('Join a room to chat'); openChat(); });
-  el('shopOpenBtn').addEventListener('click', openShop);
+  el('leaveRoom').addEventListener('click', ()=> { 
+      showNotification('Are you sure you want to leave the room?', 'Confirm Leave', [
+          { text: 'Leave', class: 'btn', onClick: leaveRoom },
+          { text: 'Stay', class: 'btn secondary' }
+      ]);
+  });
+  el('copyRoom').addEventListener('click', ()=> { if(!currentRoom) return; navigator.clipboard?.writeText(currentRoom).then(()=>showNotification('Room code copied!'), ()=>showNotification('Could not copy code.')); });
 
   // ================= ROOM UI APPLY =================
   function applyRoomUI(connected, code){
+    const multiplayerModal = el('multiplayerModal');
     if(connected){
       document.body.classList.add('room-mode');
       el('connectionStatus').textContent = 'Connected';
       el('roomCode').textContent = code;
-      el('copyRoom').style.display = 'inline-block';
-      el('leaveRoom').style.display = 'inline-block';
-      el('chatOpenBtn').style.display = 'inline-block';
-      currentRoom = code;
+      multiplayerModal.style.display = 'flex';
+      setTimeout(() => el('multiplayerBox').classList.add('show'), 10);
       renderShopGrid(currentTier);
     } else {
       document.body.classList.remove('room-mode');
-      el('connectionStatus').textContent = 'Not connected';
-      el('roomCode').textContent = '';
-      el('copyRoom').style.display = 'none';
-      el('leaveRoom').style.display = 'none';
-      el('chatOpenBtn').style.display = 'none';
-      currentRoom = null;
+      el('multiplayerBox').classList.remove('show');
+      setTimeout(() => multiplayerModal.style.display = 'none', 180);
     }
   }
 
-  // ================= MESSAGES CLEANUP ON UNLOAD =================
+  // ================= CLEANUP ON UNLOAD =================
   window.addEventListener('beforeunload', async ()=>{
     try{
       if(currentRoom && db && auth && auth.currentUser){
@@ -795,12 +872,8 @@
     }catch(e){}
   });
 
-  // small initial UI
   applyUI();
-
-  // expose for debugging
   window.GubbyClicker = { state, saveLocalState, loadLocalState, openShop, hostRoom, joinRoom, leaveRoom };
-
   </script>
 </body>
 </html>
