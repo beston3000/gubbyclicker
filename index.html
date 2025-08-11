@@ -6,61 +6,72 @@
   <title>Gubby Clicker — Firestore Multiplayer</title>
   <style>
     :root{
-      --bg:#ffffff; --bg-2:#f4fbff;
-      --accent:#61b7ff; --accent2:#8fd6ff;
-      --room-accent:#ffd9a8; --room-accent2:#ffe7c9;
-      --muted:#6b7280; --card:#fff;
+      --bg:#f8fafc; --bg-2:#f1f5f9;
+      --accent:#38bdf8; --accent2:#7dd3fc;
+      --room-accent:#facc15; --room-accent2:#fde047;
+      --muted:#94a3b8; --card:#fff;
+      --text-dark: #1e293b; --text-light: #f8fafc;
       --maxw:1200px;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     }
-    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial}
-    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),var(--bg-2));-webkit-user-select:none;-ms-user-select:none;user-select:none;}
-    body.room-mode{background:linear-gradient(180deg,var(--room-accent),var(--room-accent2));}
-    .wrap{max-width:var(--maxw);margin:20px auto;padding:14px;display:flex;flex-direction:column;gap:12px}
-    header{display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--card);border-radius:10px;box-shadow:0 10px 40px rgba(10,20,40,0.06)}
+    *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"}
+    html,body{height:100%;margin:0;background:var(--bg);-webkit-user-select:none;-ms-user-select:none;user-select:none;color: var(--text-dark);}
+    body.room-mode{background:var(--room-accent2);}
+    .wrap{max-width:var(--maxw);margin:24px auto;padding:14px;display:flex;flex-direction:column;gap:16px}
+    header{display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--card);border-radius:12px;box-shadow:var(--shadow-md)}
     .brand{display:flex;align-items:center;gap:12px}
-    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:white;font-weight:800}
-    .title{font-size:18px;margin:0}
-    .subtitle{font-size:13px;color:var(--muted)}
+    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:24px;}
+    .title{font-size:20px;margin:0;font-weight:700;}
+    .subtitle{font-size:14px;color:var(--muted)}
     .top-actions{display:flex;gap:8px;align-items:center}
-    .btn{padding:10px 12px;border-radius:10px;border:0;background:var(--accent);color:white;font-weight:700;cursor:pointer;transition: all .2s;}
-    .btn:hover{filter:brightness(1.1);}
-    .btn.secondary{background:white;color:var(--accent);border:1px solid rgba(75,110,255,0.12)}
-    .btn.ghost{background:transparent;border:1px solid rgba(12,40,80,0.06);color:var(--muted)}
-    .grid{display:grid;grid-template-columns:1fr 360px;gap:14px}
+    .btn{padding:10px 16px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer;transition: all .2s;}
+    .btn:hover{transform: translateY(-1px); box-shadow: var(--shadow-md);}
+    .btn:active{transform: translateY(0); box-shadow: var(--shadow-sm);}
+    .btn.secondary{background:var(--bg-2);color:var(--text-dark);border:1px solid #e2e8f0;}
+    .btn.ghost{background:transparent;border:1px solid transparent;color:var(--muted)}
+    .btn.ghost:hover{background:var(--bg-2);color:var(--text-dark);border-color:#e2e8f0;}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
     @media (max-width:1000px){ .grid{grid-template-columns:1fr 320px} }
-    @media (max-width:760px){ .grid{grid-template-columns:1fr} header{flex-direction:column;align-items:stretch} .top-actions{justify-content:flex-end} }
-    .card{background:var(--card);padding:12px;border-radius:10px;border:1px solid rgba(12,40,80,0.04)}
-    .house{height:420px;border-radius:10px;background:linear-gradient(180deg,#fff,#eef9ff);position:relative;overflow:hidden;border:1px solid rgba(12,40,80,0.04)}
+    @media (max-width:760px){ .grid{grid-template-columns:1fr} header{flex-direction:column;align-items:stretch;gap:12px;} .top-actions{justify-content:flex-end} }
+    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:var(--shadow-sm); border: 1px solid #e2e8f0;}
+    .house{height:420px;border-radius:12px;background:linear-gradient(180deg,#fff,#eef9ff);position:relative;overflow:hidden;border:1px solid #e2e8f0;}
     .gubby{
         position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:140px;height:140px;pointer-events:auto;cursor:pointer;
-        -webkit-user-select: none; /* Safari */ -moz-user-select: none; /* Firefox */ -ms-user-select: none; /* IE 10+ */ user-select: none; /* Standard syntax */
+        -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
         -webkit-user-drag: none; -khtml-user-drag: none; -moz-user-drag: none; -o-user-drag: none; user-drag: none;
+        transition: transform 0.2s ease;
     }
-    .stats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px}
-    .stat{min-width:160px;background:white;border-radius:10px;padding:10px;border:1px solid rgba(12,40,80,0.04);text-align:center}
-    .stat .label{font-size:12px;color:var(--muted)}
-    .stat .value{font-weight:800;font-size:18px;margin-top:6px}
-    .bar{height:12px;background:#eef6ff;border-radius:999px;margin-top:8px;overflow:hidden}
+    .gubby:active { transform: translate(-50%, -50%) scale(0.95); }
+    .stats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+    .stat{min-width:160px;background:white;border-radius:10px;padding:12px;border:1px solid #e2e8f0;text-align:center}
+    .stat .label{font-size:12px;color:var(--muted); font-weight: 500;}
+    .stat .value{font-weight:700;font-size:18px;margin-top:6px}
+    .bar{height:12px;background:#e2e8f0;border-radius:999px;margin-top:8px;overflow:hidden}
     .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .2s}
     body.room-mode .fill{background:linear-gradient(90deg,var(--room-accent),var(--room-accent2))}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
-    .right-col{display:flex;flex-direction:column;gap:12px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+    .right-col{display:flex;flex-direction:column;gap:16px}
     .member-list{display:flex;flex-direction:column;gap:8px}
-    .modal-backdrop{position:fixed;inset:0;background:rgba(8,10,20,0.45);display:none;align-items:center;justify-content:center;z-index:999}
-    .modal{width:92%;max-width:500px;background:white;border-radius:10px;padding:16px;box-shadow:0 30px 80px rgba(12,40,80,0.2);transform:translateY(8px);opacity:0;transition:all .18s}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(15, 23, 42, 0.4);display:none;align-items:center;justify-content:center;z-index:999}
+    .modal{width:92%;max-width:500px;background:var(--bg);border-radius:12px;padding:20px;box-shadow:var(--shadow-lg);transform:translateY(8px);opacity:0;transition:all .2s ease-out; display:flex; flex-direction: column;}
     .modal.show{transform:none;opacity:1}
-    .shop-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px}
-    .shop-card{border-radius:10px;padding:10px;background:linear-gradient(180deg,#fff,#f6fbff);border:1px solid rgba(12,40,80,0.04);display:flex;flex-direction:column;gap:8px;min-height:110px}
-    .chat-window{height:360px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;border:1px solid rgba(12,40,80,0.06)}
-    .chat-messages{flex:1;padding:10px;overflow:auto;background:#fbfdff}
-    .chat-input{display:flex;gap:8px;padding:8px;border-top:1px solid rgba(12,40,80,0.04);background:white}
+    .modal-content-scrollable { overflow-y: auto; max-height: 60vh; padding-right: 12px; margin-right: -12px; }
+    .shop-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px;}
+    .shop-card{border-radius:10px;padding:12px;background:var(--card);border:1px solid #e2e8f0;display:flex;flex-direction:column;gap:8px;min-height:110px; justify-content: space-between;}
+    .chat-window{height:360px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;}
+    .chat-messages{flex:1;padding:10px;overflow:auto;background:#f8fafc}
+    .chat-input{display:flex;gap:8px;padding:8px;border-top:1px solid #e2e8f0;background:white}
     .small{font-size:13px;color:var(--muted)}
-    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
-    .shop-tabs{display:flex;gap:4px;border-bottom:1px solid #eee;margin-bottom:12px;}
-    .shop-tab{padding:8px 12px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:600;color:var(--muted);border:1px solid transparent;border-bottom:0;}
-    .shop-tab.active{color:var(--accent);background:white;border-color:#eee;}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
+    .shop-tabs{display:flex;gap:4px;border-bottom:1px solid #e2e8f0;margin-bottom:16px;}
+    .shop-tab{padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:600;color:var(--muted);border:1px solid transparent;border-bottom:0; position: relative; top: 1px;}
+    .shop-tab.active{color:var(--accent);background:var(--bg);border-color:#e2e8f0; border-bottom-color: var(--bg);}
     .tab-content{display:none;}
     .tab-content.active{display:block;}
+    input[type="text"] { border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 8px; font-size: 14px; }
+    input[type="text"]:focus { outline: 2px solid var(--accent); border-color: transparent; }
   </style>
 </head>
 <body>
@@ -74,7 +85,7 @@
         </div>
       </div>
       <div class="top-actions">
-        <div id="authArea" class="small">Not signed in</div>
+        <div id="authArea" class="small" style="font-weight:500;">Not signed in</div>
         <button id="signInBtn" class="btn secondary">Sign in</button>
         <button id="upgradesOpenBtn" class="btn secondary">Upgrades</button>
         <button id="storeOpenBtn" class="btn">Store</button>
@@ -150,7 +161,7 @@
             <div id="members" class="member-list" style="margin-top: 8px;"></div>
           </div>
           
-          <div style="margin-top:12px; border-top: 1px solid #eee; padding-top: 12px;">
+          <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
               <div class="small">Room Actions</div>
               <div style="display:flex; gap: 8px; margin-top: 8px;">
                 <button id="chatOpenBtn" class="btn secondary">💬 Chat</button>
@@ -163,35 +174,37 @@
 
   <!-- Upgrades Modal -->
   <div class="modal-backdrop" id="upgradesModal"><div class="modal" id="upgradesBox" style="max-width: 900px;">
-    <div style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;justify-content:space-between;align-items:center; flex-shrink: 0;">
       <h3 style="margin:0">Upgrades</h3>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="small">Clicks: <span id="clickCounterUpgrades">0</span></div>
         <button id="closeUpgrades" class="btn secondary">Close</button>
       </div>
     </div>
-    <div class="shop-tabs">
+    <div class="shop-tabs" style="flex-shrink: 0;">
         <div class="shop-tab active" data-tab="upgrades-general">Upgrades</div>
         <div class="shop-tab" data-tab="upgrades-variants">Variants</div>
     </div>
-    <div id="upgrades-general" class="tab-content active">
-        <div id="upgradesGrid" class="shop-grid"></div>
-    </div>
-    <div id="upgrades-variants" class="tab-content">
-        <div id="variantsGrid" class="shop-grid"></div>
+    <div class="modal-content-scrollable">
+        <div id="upgrades-general" class="tab-content active">
+            <div id="upgradesGrid" class="shop-grid"></div>
+        </div>
+        <div id="upgrades-variants" class="tab-content">
+            <div id="variantsGrid" class="shop-grid"></div>
+        </div>
     </div>
   </div></div>
   
   <!-- Convenience Store Modal -->
   <div class="modal-backdrop" id="storeModal"><div class="modal" id="storeBox" style="max-width: 900px;">
-    <div style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;justify-content:space-between;align-items:center; flex-shrink: 0;">
       <h3 style="margin:0">Convenience Store</h3>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="small">Clicks: <span id="clickCounterStore">0</span></div>
         <button id="closeStore" class="btn secondary">Close</button>
       </div>
     </div>
-    <div style="margin-top:12px">
+    <div class="modal-content-scrollable" style="margin-top:16px;">
       <div id="storeGrid" class="shop-grid"></div>
     </div>
   </div></div>
@@ -210,7 +223,7 @@
     <div style="margin-top:12px" class="chat-window">
       <div id="chatMessages" class="chat-messages"></div>
       <div class="chat-input">
-        <input id="chatInput" placeholder="Say something..." style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(12,40,80,0.06)"/>
+        <input id="chatInput" type="text" placeholder="Say something..." style="flex:1;"/>
         <button id="chatSend" class="btn">Send</button>
         <button id="chatClear" class="btn ghost small">Clear</button>
       </div>
@@ -220,7 +233,7 @@
   <!-- Join Modal -->
   <div class="modal-backdrop" id="joinModal"><div class="modal" id="joinBox">
     <h3>Join Room</h3>
-    <input id="joinCode" placeholder="4-letter code" style="padding:8px;width:180px;border-radius:6px;border:1px solid #ddd"/>
+    <input id="joinCode" type="text" placeholder="4-letter code" style="margin-top:12px;"/>
     <div class="modal-actions">
       <button id="joinConfirm" class="btn">Join</button>
       <button id="joinCancel" class="btn secondary">Cancel</button>
@@ -605,10 +618,11 @@
   
   document.querySelectorAll('.shop-tab').forEach(tab => {
       tab.addEventListener('click', () => {
-          document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
-          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+          const parent = tab.closest('.modal');
+          parent.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+          parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
           tab.classList.add('active');
-          document.getElementById(tab.dataset.tab).classList.add('active');
+          parent.querySelector('#' + tab.dataset.tab).classList.add('active');
       });
   });
 
@@ -638,7 +652,7 @@
     variantsData.forEach(item => {
       const card = document.createElement('div'); card.className='shop-card';
       const isOwned = owned.includes(item.id);
-      card.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${item.title}</strong><div class="small">${item.desc}</div></div><div style="text-align:right"><div class="small">${item.price} ✨</div></div></div>
+      card.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${item.title}</strong><div class="small">${item.desc || 'A new look for Gubby!'}</div></div><div style="text-align:right"><div class="small">${item.price || 500} ✨</div></div></div>
         <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:8px"><div><button class="btn small ${isOwned?'ghost':''}" ${isOwned?'disabled':''}>${isOwned?'Owned':'Buy'}</button></div></div>`;
       const btn = card.querySelector('button');
       btn.addEventListener('click', ()=> buyItem(item, 'variant'));
@@ -659,24 +673,23 @@
   }
 
   async function buyItem(item, type){
-    if (state.totalClicks < item.price) return showNotification('Not enough clicks.');
+    const price = item.price || 500; // Default price for variants if not set
+    if (state.totalClicks < price) return showNotification('Not enough clicks.');
 
     if (type === 'consumable') {
-        state.totalClicks -= item.price;
+        state.totalClicks -= price;
         if(item.id === 'burger') state.backpack.food = (state.backpack.food||0)+1;
         if(item.id === 'waterbottle') state.backpack.water = (state.backpack.water||0)+1;
         if(item.id === 'soda_pack') state.backpack.cola = (state.backpack.cola||0)+2;
-        // ... other consumables
         scheduleWrite();
         showNotification(`Purchased ${item.title}`);
         return;
     }
     
-    // Logic for one-time purchases (upgrades and variants)
     if(!currentRoom){
       const owned = getOwnedItems();
       if (owned.includes(item.id)) return showNotification("You already own this item.");
-      state.totalClicks -= item.price;
+      state.totalClicks -= price;
       
       if (type === 'variant') state.variant = item.id;
       if (item.id === 'clicker1') state.upgrades.clickPower = (state.upgrades.clickPower||1)+1;
@@ -701,11 +714,11 @@
         if(owned.includes(item.id)) throw new Error('Already owned by someone in the room');
         const roomState = data.state || {};
         const totalClicks = Number(roomState.totalClicks || 0);
-        if(totalClicks < item.price) throw new Error('Not enough room clicks');
+        if(totalClicks < price) throw new Error('Not enough room clicks');
         
         const newOwned = owned.concat([item.id]);
         const newState = Object.assign({}, roomState);
-        newState.totalClicks = totalClicks - item.price;
+        newState.totalClicks = totalClicks - price;
 
         if (type === 'variant') newState.variant = item.id;
         if (item.id === 'clicker1') newState.upgrades = Object.assign({}, newState.upgrades || {}, { clickPower: (newState.upgrades?.clickPower||1)+1 });
@@ -755,7 +768,6 @@
       container.scrollTop = container.scrollHeight;
     }, err => {
       console.warn('messages listen err', err);
-      showNotification('Chat listen error: ' + (err.message||err));
     });
   }
 
@@ -824,7 +836,7 @@
         return;
     }
     arr.forEach(m=>{
-      const d = document.createElement('div'); d.className='small'; d.style.padding='6px'; d.style.borderRadius='6px'; d.style.border='1px solid rgba(12,40,80,0.04)'; d.textContent = m.name || m.uid;
+      const d = document.createElement('div'); d.className='small'; d.style.padding='6px 10px'; d.style.borderRadius='6px'; d.style.border='1px solid #e2e8f0'; d.textContent = m.name || m.uid;
       wrap.appendChild(d);
     });
   }
