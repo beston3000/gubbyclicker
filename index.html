@@ -12,9 +12,9 @@
       --muted:#94a3b8; --card:#fff;
       --text-dark: #1e293b; --text-light: #f8fafc;
       --maxw:1200px;
-      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --shadow-sm: 0 1.2px 2.4px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4.8px 7.2px -1.2px rgb(0 0 0 / 0.1), 0 2.4px 4.8px -2.4px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 12px 18px -3.6px rgb(0 0 0 / 0.1), 0 4.8px 7.2px -4.8px rgb(0 0 0 / 0.1);
     }
     *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"}
     html,body{height:100%;margin:0;background:var(--bg);-webkit-user-select:none;-ms-user-select:none;user-select:none;color: var(--text-dark);}
@@ -29,14 +29,14 @@
     .btn{padding:10px 16px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer;transition: all .2s;}
     .btn:hover{transform: translateY(-1px); box-shadow: var(--shadow-md);}
     .btn:active{transform: translateY(0); box-shadow: var(--shadow-sm);}
-    .btn.secondary{background:var(--bg-2);color:var(--text-dark);border:1px solid #e2e8f0;}
-    .btn.ghost{background:transparent;border:1px solid transparent;color:var(--muted)}
+    .btn.secondary{background:var(--bg-2);color:var(--text-dark);border:1.2px solid #e2e8f0;}
+    .btn.ghost{background:transparent;border:1.2px solid transparent;color:var(--muted)}
     .btn.ghost:hover{background:var(--bg-2);color:var(--text-dark);border-color:#e2e8f0;}
     .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
     @media (max-width:1000px){ .grid{grid-template-columns:1fr 320px} }
     @media (max-width:760px){ .grid{grid-template-columns:1fr} header{flex-direction:column;align-items:stretch;gap:12px;} .top-actions{justify-content:flex-end} }
-    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:var(--shadow-sm); border: 1px solid #e2e8f0;}
-    .house{height:420px;border-radius:12px;background:linear-gradient(180deg,#fff,#eef9ff);position:relative;overflow:hidden;border:1px solid #e2e8f0;}
+    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:var(--shadow-sm); border: 1.2px solid #e2e8f0;}
+    .house{height:420px;border-radius:12px;background-image:url('../sprites/house.png'); background-size:cover; background-position: center; position:relative;overflow:hidden;border:1.2px solid #e2e8f0;}
     .gubby{
         position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:140px;height:140px;pointer-events:auto;cursor:pointer;
         -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
@@ -47,7 +47,7 @@
         transform: translate(-50%, -50%) scale(1.1);
     }
     .stats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
-    .stat{min-width:160px;background:white;border-radius:10px;padding:12px;border:1px solid #e2e8f0;text-align:center}
+    .stat{min-width:160px;background:white;border-radius:10px;padding:12px;border:1.2px solid #e2e8f0;text-align:center}
     .stat .label{font-size:12px;color:var(--muted); font-weight: 500;}
     .stat .value{font-weight:700;font-size:18px;margin-top:6px}
     .bar{height:12px;background:#e2e8f0;border-radius:999px;margin-top:8px;overflow:hidden}
@@ -61,19 +61,19 @@
     .modal.show{transform:none;opacity:1}
     .modal-content-scrollable { overflow-y: auto; max-height: 60vh; padding-right: 12px; margin-right: -12px; }
     .shop-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px;}
-    .shop-card{border-radius:10px;padding:12px;background:var(--card);border:1px solid #e2e8f0;display:flex;flex-direction:column;gap:8px;min-height:110px; justify-content: space-between;}
-    .chat-window{height:360px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;}
+    .shop-card{border-radius:10px;padding:12px;background:var(--card);border:1.2px solid #e2e8f0;display:flex;flex-direction:column;gap:8px;min-height:110px; justify-content: space-between;}
+    .chat-window{height:360px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;border:1.2px solid #e2e8f0;}
     .chat-messages{flex:1;padding:10px;overflow:auto;background:#f8fafc}
-    .chat-input{display:flex;gap:8px;padding:8px;border-top:1px solid #e2e8f0;background:white}
+    .chat-input{display:flex;gap:8px;padding:8px;border-top:1.2px solid #e2e8f0;background:white}
     .small{font-size:13px;color:var(--muted)}
     .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
-    .shop-tabs{display:flex;gap:4px;border-bottom:1px solid #e2e8f0;margin-bottom:16px;}
-    .shop-tab{padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:600;color:var(--muted);border:1px solid transparent;border-bottom:0; position: relative; top: 1px;}
+    .shop-tabs{display:flex;gap:4px;border-bottom:1.2px solid #e2e8f0;margin-bottom:16px;}
+    .shop-tab{padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:600;color:var(--muted);border:1.2px solid transparent;border-bottom:0; position: relative; top: 1.2px;}
     .shop-tab.active{color:var(--accent);background:var(--bg);border-color:#e2e8f0; border-bottom-color: var(--bg);}
     .tab-content{display:none;}
     .tab-content.active{display:block;}
-    input[type="text"], input[type="number"], select { width: 100%; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 8px; font-size: 14px; background: white; }
-    input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    input[type="text"], input[type="number"], select { width: 100%; border: 1.2px solid #e2e8f0; padding: 8px 12px; border-radius: 8px; font-size: 14px; background: white; }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: 2.4px solid var(--accent); border-color: transparent; }
     .form-group { display: flex; flex-direction: column; gap: 6px; }
     #attributesList { list-style-type: none; padding: 0; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
     #attributesList li { background: var(--bg-2); padding: 8px 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
@@ -107,6 +107,7 @@
           <div class="stat"><div class="label">HUNGER</div><div class="value" id="hungerVal">0</div><div class="bar"><div id="hungerFill" class="fill" style="width:0%"></div></div></div>
           <div class="stat"><div class="label">THIRST</div><div class="value" id="thirstVal">0</div><div class="bar"><div id="thirstFill" class="fill" style="width:0%"></div></div></div>
           <div class="stat"><div class="label">ENERGY</div><div class="value" id="energyVal">0</div><div class="bar"><div id="energyFill" class="fill" style="width:0%"></div></div></div>
+          <div class="stat"><div class="label">HAPPINESS</div><div class="value" id="happinessVal">0</div><div class="bar"><div id="happinessFill" class="fill" style="width:0%"></div></div></div>
         </div>
 
         <div class="controls">
@@ -205,7 +206,7 @@
             <div id="members" class="member-list" style="margin-top: 8px;"></div>
           </div>
           
-          <div style="margin-top:12px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+          <div style="margin-top:12px; border-top: 1.2px solid #e2e8f0; padding-top: 12px;">
               <div class="small">Room Actions</div>
               <div style="display:flex; gap: 8px; margin-top: 8px;">
                 <button id="chatOpenBtn" class="btn secondary">💬 Chat</button>
@@ -228,6 +229,7 @@
     <div class="shop-tabs" style="flex-shrink: 0;">
         <div class="shop-tab active" data-tab="upgrades-general">Upgrades</div>
         <div class="shop-tab" data-tab="upgrades-variants">Variants</div>
+        <div class="shop-tab" data-tab="upgrades-toys">Toys</div>
     </div>
     <div class="modal-content-scrollable">
         <div id="upgrades-general" class="tab-content active">
@@ -235,6 +237,9 @@
         </div>
         <div id="upgrades-variants" class="tab-content">
             <div id="variantsGrid" class="shop-grid"></div>
+        </div>
+        <div id="upgrades-toys" class="tab-content">
+            <div id="toysGrid" class="shop-grid"></div>
         </div>
     </div>
   </div></div>
@@ -315,7 +320,7 @@
     name:'Gubby',
     variant:'default.png',
     pos:{x:340,y:220},
-    hunger:80, thirst:80, energy:100, alive:true,
+    hunger:80, thirst:80, energy:100, happiness: 75, alive:true,
     clicks:0, totalClicks:0,
     upgrades:{clickPower:1, autoClicks:0},
     backpack:{ food:5, water:5, cola:2 },
@@ -328,14 +333,12 @@
   const WRITE_DEBOUNCE_MS = 600;
   let variantsData = [];
   let tempAttributes = {};
+  let playCooldown = false;
 
   // ================= SHOP DATA =================
   const upgradesData = [
     {id:'clicker1', title:'Click Power +1', price:200, desc:'Increase click power'},
     {id:'auto1', title:'Auto-Clicker +1', price:800, desc:'+1 auto click'},
-    {id:'laser_toy', title:'Laser Toy', price:480, desc:'Fun and energizing'},
-    {id:'bowl2', title:'Silver Bowl', price:400, desc:'Better food efficiency'},
-    {id:'microphone', title:'DJ Microphone', price:480, desc:'Music multiplier chance'},
     {id:'auto_feeder2', title:'Auto-Feeder Mk II', price:2400, desc:'+5 auto clicks'},
     {id:'bed', title:'Cozy Bed', price:350, desc:'Energy recovers faster'},
     {id:'mini_farm', title:'Mini Farm', price:2200, desc:'Generates food slowly'},
@@ -345,7 +348,12 @@
     {id:'waterbottle', title:'Water Bottle', price:20, desc:'Water +1'},
     {id:'soda_pack', title:'Cola Pack', price:350, desc:'+2 Cola'},
   ];
-  const possibleAttributes = ['clickMultiplier', 'autoClickRate', 'hungerDecayMod', 'thirstDecayMod', 'energyGainMod'];
+    const toysData = [
+    {id:'ball', title:'Bouncy Ball', price:150, desc:'+2% happiness every 45s', happinessBoost: 0.02},
+    {id:'plushie', title:'Plushie', price:500, desc:'+5% happiness every 45s', happinessBoost: 0.05},
+    {id:'laser_toy', title:'Laser Toy', price:1200, desc:'+8% happiness every 45s', happinessBoost: 0.08},
+  ];
+  const possibleAttributes = ['clickMultiplier', 'autoClickRate', 'hungerDecayMod', 'thirstDecayMod', 'energyGainMod', 'happinessDecayMod'];
 
 
   // ================= UTIL =================
@@ -387,9 +395,11 @@
     el('hungerVal').textContent = Math.round(state.hunger);
     el('thirstVal').textContent = Math.round(state.thirst);
     el('energyVal').textContent = Math.round(state.energy);
+    el('happinessVal').textContent = Math.round(state.happiness);
     el('hungerFill').style.width = clamp(state.hunger) + '%';
     el('thirstFill').style.width = clamp(state.thirst) + '%';
     el('energyFill').style.width = clamp(state.energy) + '%';
+    el('happinessFill').style.width = clamp(state.happiness) + '%';
     const clicks = state.totalClicks || 0;
     el('clickCounterUpgrades') && (el('clickCounterUpgrades').textContent = clicks);
     el('clickCounterStore') && (el('clickCounterStore').textContent = clicks);
@@ -614,6 +624,7 @@
     state.hunger = Math.round((state.hunger + (remote.hunger||state.hunger))/2);
     state.thirst = Math.round((state.thirst + (remote.thirst||state.thirst))/2);
     state.energy = Math.round((state.energy + (remote.energy||state.energy))/2);
+    state.happiness = Math.round((state.happiness + (remote.happiness||state.happiness))/2);
     saveLocalState(); applyUI();
   }
   
@@ -660,7 +671,7 @@
       setTimeout(()=> el(modalId).style.display='none',180);
   }
 
-  el('upgradesOpenBtn').addEventListener('click', ()=> { openModal('upgradesModal', 'upgradesBox'); renderUpgradesShop(); renderVariantsShop(); });
+  el('upgradesOpenBtn').addEventListener('click', ()=> { openModal('upgradesModal', 'upgradesBox'); renderUpgradesShop(); renderVariantsShop(); renderToysShop(); });
   el('closeUpgrades').addEventListener('click', ()=> closeModal('upgradesModal', 'upgradesBox'));
   el('storeOpenBtn').addEventListener('click', ()=> { openModal('storeModal', 'storeBox'); renderStore(); });
   el('closeStore').addEventListener('click', ()=> closeModal('storeModal', 'storeBox'));
@@ -709,6 +720,20 @@
     });
   }
   
+  function renderToysShop() {
+    const grid = el('toysGrid'); grid.innerHTML = '';
+    const owned = getOwnedItems();
+    toysData.forEach(item => {
+      const card = document.createElement('div'); card.className='shop-card';
+      const isOwned = owned.includes(item.id);
+      card.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${item.title}</strong><div class="small">${item.desc}</div></div><div style="text-align:right"><div class="small">${item.price} ✨</div></div></div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:8px"><div><button class="btn small ${isOwned?'ghost':''}" ${isOwned?'disabled':''}>${isOwned?'Owned':'Buy'}</button></div></div>`;
+      const btn = card.querySelector('button');
+      btn.addEventListener('click', ()=> buyItem(item, 'toy'));
+      grid.appendChild(card);
+    });
+  }
+  
   function renderStore(){
     const grid = el('storeGrid'); grid.innerHTML = '';
     storeData.forEach(item => {
@@ -751,6 +776,7 @@
       showNotification(`Purchased (singleplayer): ${item.title || item.id}`);
       renderUpgradesShop();
       renderVariantsShop();
+      renderToysShop();
       return;
     }
 
@@ -958,7 +984,7 @@
         return;
     }
     arr.forEach(m=>{
-      const d = document.createElement('div'); d.className='small'; d.style.padding='6px 10px'; d.style.borderRadius='6px'; d.style.border='1px solid #e2e8f0'; d.textContent = m.name || m.uid;
+      const d = document.createElement('div'); d.className='small'; d.style.padding='6px 10px'; d.style.borderRadius='6px'; d.style.border='1.2px solid #e2e8f0'; d.textContent = m.name || m.uid;
       wrap.appendChild(d);
     });
   }
@@ -996,7 +1022,18 @@
   el('feedBtn').addEventListener('click', ()=> { if(state.backpack.food>0){ state.backpack.food--; state.hunger = Math.min(100, state.hunger+25); scheduleWrite(); } else showNotification('You have no food!');});
   el('waterBtn').addEventListener('click', ()=> { if(state.backpack.water>0){ state.backpack.water--; state.thirst = Math.min(100, state.thirst+25); scheduleWrite(); } else showNotification('You have no water!');});
   el('colaBtn').addEventListener('click', ()=> { if(state.backpack.cola>0){ state.backpack.cola--; state.energy = Math.min(100, state.energy+50); scheduleWrite(); } else showNotification('You have no Bloxy Cola!');});
-  el('playBtn').addEventListener('click', ()=> { state.energy = Math.min(100, state.energy+8); scheduleWrite(); });
+  
+  el('playBtn').addEventListener('click', ()=> {
+      if (playCooldown) return showNotification("You need to wait before playing again.");
+      state.happiness = Math.min(100, state.happiness + 15);
+      playCooldown = true;
+      el('playBtn').disabled = true;
+      setTimeout(() => {
+          playCooldown = false;
+          el('playBtn').disabled = false;
+      }, 60000); // 1 minute cooldown
+      scheduleWrite();
+  });
 
   function wander(){
     if(!state.alive) return;
@@ -1013,12 +1050,24 @@
   setInterval(()=>{
     if(!state.alive) return;
     const currentVariant = variantsData.find(v => v.fileName === state.variant);
+    const owned = getOwnedItems();
+    let happinessBoost = 0;
+    toysData.forEach(toy => {
+        if (owned.includes(toy.id)) {
+            happinessBoost += toy.happinessBoost;
+        }
+    });
+
+    state.happiness = Math.min(100, state.happiness + happinessBoost);
+    
     const hungerDecay = currentVariant?.hungerDecayMod || 0.5;
     const thirstDecay = currentVariant?.thirstDecayMod || 0.6;
     const energyGain = currentVariant?.energyGainMod || 1;
+    const happinessDecay = currentVariant?.happinessDecayMod || 0.2;
     
     state.hunger = Math.max(0, state.hunger - hungerDecay);
     state.thirst = Math.max(0, state.thirst - thirstDecay);
+    state.happiness = Math.max(0, state.happiness - happinessDecay);
     
     const hour = (new Date()).getHours();
     if(hour>=22||hour<7) state.energy = Math.min(100, state.energy + energyGain); else state.energy = Math.max(0, state.energy - 0.2);
@@ -1028,7 +1077,7 @@
     state.clicks += state.upgrades.autoClicks + autoClickRate;
     state.totalClicks += state.upgrades.autoClicks + autoClickRate;
 
-    if(state.energy <= 0 || state.hunger <= 0 || state.thirst <= 0){
+    if(state.energy <= 0 || state.hunger <= 0 || state.thirst <= 0 || state.happiness <= 0){
       state.alive = false; scheduleWrite(); showGameOver();
     }
     scheduleWrite();
